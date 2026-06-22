@@ -15,7 +15,7 @@ import {
   enforceProvinceConnect,
   limitProvincePopulation,
   minProvinceArea,
-} from './provinces';
+} from './provinces/index';
 import { assignMaritimeZones, getNationCount, isLand, limitMountainSplit } from './shared';
 
 const T_NATION_POPULATION_MULTIPLIER_RANGE: [number, number] = [0.1, 5.0];

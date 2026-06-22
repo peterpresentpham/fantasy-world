@@ -6,7 +6,7 @@ import { collectConnectedComponents, runMultiSourceExpansion } from 'src/service
 import { createSeededRandom, hashSeed } from 'src/services/utils/math';
 import { TCell, TEthnic } from 'src/global';
 import Cost from './cost';
-import { createRegionalName, edgeNoise, isLand } from './shared';
+import { createRegionalName, edgeNoise, getOwnerLandCellIds, isLand } from './shared';
 
 type TEthnicConfig = typeof GEOPOLITICAL_CONFIG.ethnic;
 const T_MIN_ETHNIC_POPULATION = 1000;
@@ -145,9 +145,7 @@ function enforceNationEthnicDominance(
 
   const nationIds = Array.from(new Set(nationOwner)).filter((nationId) => nationId >= 0);
   for (const nationId of nationIds) {
-    const nationCells = cells
-      .filter((cell) => isLand(cell) && nationOwner[cell.id] === nationId)
-      .map((cell) => cell.id);
+    const nationCells = getOwnerLandCellIds(cells, nationOwner, nationId);
     if (nationCells.length === 0) continue;
 
     const ethnicCounts = new Map<number, number>();
@@ -463,7 +461,7 @@ function spreadEthnicsAcrossNations(
   }
 }
 
-function fillUnclaimedLand(cells: TCell[], ethnicOwner: Int32Array) {
+function fillUnclaimedEthnicLand(cells: TCell[], ethnicOwner: Int32Array) {
   const claimedLandIds = cells
     .filter((cell) => isLand(cell) && ethnicOwner[cell.id] >= 0)
     .map((cell) => cell.id);
@@ -669,7 +667,7 @@ export function buildEthnicRegions(cells: TCell[], nationOwner: Int32Array, seed
   smoothCrossBorderEthnics(cells, nationOwner, ethnicOwner, config);
   spreadEthnicsAcrossNations(cells, nationOwner, ethnicOwner, ethnics);
   smoothEthnicRegions(cells, ethnicOwner, config);
-  fillUnclaimedLand(cells, ethnicOwner);
+  fillUnclaimedEthnicLand(cells, ethnicOwner);
   enforceEthnicMinPop(cells, ethnicOwner, ethnics);
 
   return { ethnicOwner, ethnics };

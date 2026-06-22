@@ -101,3 +101,27 @@ export const GEOPOLITICAL_CONFIG = {
     minorityClusterMin: 5,
   },
 };
+
+/** Province-level constants moved from provinces.ts */
+export const IDEAL_PROVINCE_POP = 500_000;
+export const MAX_PROVINCE_POP = 1_500_000;
+export const MERGE_POP_CAP = 800_000;
+export const MIN_POP_PERCENT = 0.03;
+export const MAX_POP_PERCENT = 0.12;
+export const SMALL_NATION_POPULATION_THRESHOLD = 1_000;
+export const SMALL_NATION_MIN_PROVINCE_POPULATION = 200;
+export const DEFAULT_MIN_PROVINCE_POPULATION = 1_000;
+export const PROVINCE_TUNING = {
+  seedDistance: { plainOrValley: 42, other: 72, minBetweenSeeds: 26 },
+  split: { maxIterations: 20, maxProvinceAreaFactor: 3.4 },
+  rebalance: { softPasses: 2, strictPasses: 12 },
+  thresholds: {
+    lowPopulationRatio: 0.62,
+    remotePlainWaterAccessScoreMax: 0.38,
+    ruggedPenalty: 0.22,
+    sparseLargeProvinceBias: 0.48,
+    pressure: { min: 0.32, max: 2.45, popFactor: 0.58, waterFactor: 0.24, waterNodeBonus: 0.18 },
+    geography: { largeSparseFactor: 1.35, terrainAdjustedMinFactor: 0.9 },
+    economySpecialFactor: 1.45,
+  },
+};

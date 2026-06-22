@@ -1,9 +1,9 @@
 import { GEOPOLITICAL_CONFIG } from 'src/configs/map/geopolitics';
+import { TBorderType, TCell } from 'src/global';
 import { sortDescStable } from 'src/services/utils';
 import { findNearestCell } from 'src/services/utils/geometry';
 import { runMultiSourceExpansion } from 'src/services/utils/graph';
 import { clamp, createSeededRandom } from 'src/services/utils/math';
-import { TBorderType, TCell } from 'src/global';
 import { getNationSeedSuitability } from './cost';
 import {
   getBoundaryStepCost,
@@ -11,6 +11,7 @@ import {
   getNationNeighborCounts,
   isLand,
   makeFrontierHash,
+  reassignDisconnectedFragments,
 } from './shared';
 
 const LARGE_LAND_COMPONENT_MIN_CELLS = 200;
@@ -835,50 +836,11 @@ export function diversifySmallNationSizes(cells: TCell[], owner: Int32Array, see
 export function enforceMainlandContiguity(cells: TCell[], owner: Int32Array) {
   const nationIds = Array.from(new Set(owner)).filter((nationId) => nationId >= 0);
 
-  for (const nationId of nationIds) {
-    const nationCells = cells
-      .filter((cell) => isLand(cell) && owner[cell.id] === nationId)
-      .map((cell) => cell.id);
-    if (nationCells.length === 0) continue;
-
-    const visited = new Set<number>();
-    const components: number[][] = [];
-    const stack: number[] = [];
-
-    for (const startCellId of nationCells) {
-      if (visited.has(startCellId)) continue;
-      stack.length = 0;
-      stack.push(startCellId);
-      const component: number[] = [];
-      visited.add(startCellId);
-
-      while (stack.length > 0) {
-        const current = stack.pop() as number;
-        component.push(current);
-
-        for (const neighborId of cells[current].neighbors) {
-          if (owner[neighborId] !== nationId) continue;
-          if (!isLand(cells[neighborId])) continue;
-          if (visited.has(neighborId)) continue;
-          visited.add(neighborId);
-          stack.push(neighborId);
-        }
-      }
-      components.push(component);
-    }
-
-    if (components.length <= 1) continue;
-    components.sort((a, b) => b.length - a.length);
-
-    for (let componentIndex = 1; componentIndex < components.length; componentIndex += 1) {
-      for (const cellId of components[componentIndex]) {
-        const neighborCounts = getNationNeighborCounts(cells, owner, cellId);
-        neighborCounts.delete(nationId);
-        const bestNationId = pickBestNationForCell(cells, owner, cellId, neighborCounts);
-        if (bestNationId >= 0) owner[cellId] = bestNationId;
-      }
-    }
-  }
+  reassignDisconnectedFragments(cells, owner, nationIds, {
+    pickBestOwner: (cellId, neighborCounts) => {
+      return pickBestNationForCell(cells, owner, cellId, neighborCounts);
+    },
+  });
 }
 
 function fillUnclaimedLand(cells: TCell[], owner: Int32Array) {
