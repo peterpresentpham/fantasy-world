@@ -1,4 +1,5 @@
 import Cost from 'src/services/geopolitics/cost';
+import { TDeterministicMinHeap } from 'src/services/utils/collections';
 import { TCell } from 'src/global';
 
 type TLogisticsRouteResult = {
@@ -84,28 +85,28 @@ export function findLogisticsRoute({
   previous.fill(-1);
   distances[startCellId] = 0;
 
-  const frontier: Array<{ cellId: number; cost: number }> = [{ cellId: startCellId, cost: 0 }];
+  const frontier = new TDeterministicMinHeap<number>();
+  frontier.push(startCellId, 0);
 
-  while (frontier.length > 0) {
-    frontier.sort((a, b) => a.cost - b.cost);
-    const current = frontier.shift() as { cellId: number; cost: number };
-    if (visited[current.cellId] === 1) continue;
-    visited[current.cellId] = 1;
+  while (frontier.size > 0) {
+    const currentId = frontier.pop() as number;
+    if (visited[currentId] === 1) continue;
+    visited[currentId] = 1;
 
-    if (current.cellId === goalCellId) break;
+    if (currentId === goalCellId) break;
 
-    const from = cells[current.cellId];
+    const from = cells[currentId];
     for (const neighborId of from.neighbors) {
       const to = cells[neighborId];
       if (to.isWater) continue;
 
-      const hasRoad = roadEdges.has(edgeKey(current.cellId, neighborId));
-      const nextCost = distances[current.cellId] + stepCost(from, to, hasRoad);
+      const hasRoad = roadEdges.has(edgeKey(currentId, neighborId));
+      const nextCost = distances[currentId] + stepCost(from, to, hasRoad);
 
       if (nextCost < distances[neighborId]) {
         distances[neighborId] = nextCost;
-        previous[neighborId] = current.cellId;
-        frontier.push({ cellId: neighborId, cost: nextCost });
+        previous[neighborId] = currentId;
+        frontier.push(neighborId, nextCost);
       }
     }
   }

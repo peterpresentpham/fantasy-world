@@ -213,10 +213,18 @@ export default function useThreeMap({ containerRef }: TProps) {
     scene.add(cellGroup);
 
     let animId: number;
+    let needsRender = true;
+
+    controls.addEventListener('change', () => {
+      needsRender = true;
+    });
+
     function animate() {
       animId = requestAnimationFrame(animate);
       controls.update();
+      if (!needsRender) return;
       renderer.render(scene, camera);
+      needsRender = false;
     }
     animate();
 

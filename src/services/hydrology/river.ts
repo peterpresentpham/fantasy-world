@@ -1,8 +1,25 @@
 import { HYDROLOGY_CONFIG, RIVER_CONFIG } from 'src/configs/map/hydrology';
+import { TBiome, TCell, TPoint, TRiver, TRiverEndType, TRiverKind } from 'src/global';
+import { TFifoQueue } from 'src/services/utils/collections';
 import { createSeededRandom } from 'src/services/utils/math';
-import { TCell, TPoint, TRiver, TRiverEndType, TRiverKind } from 'src/global';
 
 const T_COAST_OUTLET = HYDROLOGY_CONFIG.coastOutletId;
+
+const BIOME_WATER_RETENTION: Partial<Record<TBiome, number>> = {
+  wetland: 1.5,
+  tropical_forest: 1.4,
+  temperate_forest: 1.1,
+  plain: 0.9,
+  boreal_forest: 0.85,
+  grassland: 0.8,
+  montane_shrub: 0.6,
+  savanna: 0.45,
+  steppe: 0.35,
+  tundra: 0.35,
+  ice: 0.45,
+  desert_cold: 0.15,
+  desert_hot: 0.08,
+};
 
 type TRiverGenerationResult = {
   downstream: Int32Array;
@@ -115,7 +132,11 @@ function accumulateFlow(
 
   for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
     if (isLand[cellIndex] === 0) continue;
-    flow[cellIndex] = (8 + precipitation[cellIndex] * 12) * cellModifier;
+    const cell = cells[cellIndex];
+    const biomeRetention = BIOME_WATER_RETENTION[cell.biome] ?? 0.8;
+    const aridityDamp = Math.max(0, 1 - (cell.aridityIndex ?? 0) * 0.55);
+    const precipContribution = precipitation[cellIndex] * 16 * biomeRetention * aridityDamp;
+    flow[cellIndex] = (1.5 + precipContribution) * cellModifier;
   }
 
   for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
@@ -189,11 +210,12 @@ function buildPathToWater(cells: TCell[], startCellId: number, riverByCell: Int3
   const visited = new Uint8Array(cells.length);
   const previous = new Int32Array(cells.length);
   previous.fill(-1);
-  const queue: number[] = [startCellId];
+  const queue = new TFifoQueue<number>();
+  queue.enqueue(startCellId);
   visited[startCellId] = 1;
 
-  while (queue.length > 0) {
-    const current = queue.shift() as number;
+  while (queue.size > 0) {
+    const current = queue.dequeue() as number;
     const currentCell = cells[current];
 
     for (const neighborId of currentCell.neighbors) {
@@ -217,7 +239,7 @@ function buildPathToWater(cells: TCell[], startCellId: number, riverByCell: Int3
       if (riverByCell[neighborId] >= 0 && neighborId !== startCellId) continue;
       visited[neighborId] = 1;
       previous[neighborId] = current;
-      queue.push(neighborId);
+      queue.enqueue(neighborId);
     }
   }
 
@@ -252,8 +274,12 @@ function buildRiverGraph(
       const cell = cells[cellIndex];
       if (cell.isWater) return false;
       if (!(downstream[cellIndex] >= 0 || downstream[cellIndex] === T_COAST_OUTLET)) return false;
-      if (flow[cellIndex] < threshold) return false;
-      return upstreamCount[cellIndex] <= 1 || flow[cellIndex] >= threshold * 1.4;
+      const aridity = cells[cellIndex].aridityIndex ?? 0;
+      const aridityMultiplier =
+        aridity > 1.5 ? 4.0 : aridity > 1.0 ? 2.5 : aridity > 0.7 ? 1.5 : 1.0;
+      const effectiveThreshold = threshold * aridityMultiplier;
+      if (flow[cellIndex] < effectiveThreshold) return false;
+      return upstreamCount[cellIndex] <= 1 || flow[cellIndex] >= effectiveThreshold * 1.4;
     })
     .sort((left, right) => {
       if (cells[right].elevation !== cells[left].elevation) {
@@ -312,7 +338,11 @@ function buildRiverGraph(
   const riverWidthByCell = new Float32Array(cells.length);
 
   for (const [riverId, chain] of riversRaw.entries()) {
-    if (chain.length < RIVER_CONFIG.minRiverCells) {
+    const sourceCell = cells[chain[0] as number];
+    const sourceAridity = sourceCell?.aridityIndex ?? 0;
+    const minCells =
+      sourceAridity > 1.0 ? RIVER_CONFIG.minRiverCells * 2 : RIVER_CONFIG.minRiverCells;
+    if (chain.length < minCells) {
       for (const cellId of chain) riverByCell[cellId] = -1;
       continue;
     }

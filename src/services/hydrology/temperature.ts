@@ -118,7 +118,12 @@ export function computeTemperature({
       TEMPERATURE_CONFIG.maritimeStrength;
 
     const alongWindSlope = getAlongWindSlope(cell, cells, windField[cellIndex] as TWindVector);
-    const aspectCooling = clamp(alongWindSlope * 80, -1, 1) * TEMPERATURE_CONFIG.aspectStrength;
+    // Asymmetric: leeward descent (Föhn) warms 2.5× more than windward ascent cools
+    const rawAspect = clamp(alongWindSlope * 80, -1, 1);
+    const aspectCooling =
+      rawAspect >= 0
+        ? rawAspect * TEMPERATURE_CONFIG.aspectStrength
+        : rawAspect * TEMPERATURE_CONFIG.aspectStrength * 2.5;
     const coldPool =
       Math.max(0, -reliefByCell[cellIndex]) *
       Math.max(0, 1 - flow[cellIndex] / 4) *
