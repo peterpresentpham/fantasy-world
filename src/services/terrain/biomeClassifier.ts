@@ -15,6 +15,7 @@ type TClassifyBiomesInput = {
   isRiverByCell: Uint8Array;
   isLakeByCell: Uint8Array;
   humanImpact: number;
+  latitudeByCell: Float32Array;
 };
 
 const LAND_CODE = {
@@ -60,7 +61,8 @@ function classifyLandBiome(
   tSeason: number,
   pSeason: number,
   elevSea: number,
-  flowSignalDiv5: number
+  flowSignalDiv5: number,
+  latitude: number
 ): TBiome {
   const model = BIOME_CONFIG.desert;
   if (landformCode === LAND_CODE.MARINE_DEEP || landformCode === LAND_CODE.MARINE_SHALLOW) {
@@ -84,16 +86,20 @@ function classifyLandBiome(
     flowSignalDiv5 * 0.4 -
     tSeason * 0.2;
 
+  // Tropical forest: lowered temperature threshold (0.44 vs old 0.55) to include equatorial cloud forests
   const scoreTropicalForest =
-    clamp((t - 0.55) * 2, 0, 1) * 0.8 + p * 0.45 + humid * 0.35 - pSeason * 0.2;
+    clamp((t - 0.44) * 2, 0, 1) * 0.65 + p * 0.45 + humid * 0.35 - pSeason * 0.2;
   const scoreTemperateForest =
     (1 - Math.abs(t - 0.5) * 1.35) * 0.75 + p * 0.38 + humid * 0.2 + (1 - tSeason) * 0.2;
   const scoreBorealForest =
     clamp(0.58 - t, 0, 1) * 0.68 + p * 0.24 + humid * 0.25 + clamp(elevSea - 0.12, 0, 1) * 0.2;
+  // Savanna: latitude band boost (10–20° corresponds to the ITCZ fringe with seasonal rainfall)
+  const savannaBand = Math.exp(-((latitude - 0.16) ** 2) / 0.02);
   const scoreSavanna =
     clamp((t - 0.45) * 1.9, 0, 1) * 0.65 +
     clamp(1 - Math.abs(p - 0.42) * 1.6, 0, 1) * 0.45 +
-    pSeason * 0.22;
+    pSeason * 0.22 +
+    savannaBand * (pSeason > 0.1 ? 0.25 : 0.08);
   const scoreGrassland =
     clamp(1 - Math.abs(p - 0.35) * 1.8, 0, 1) * 0.5 +
     clamp(1 - Math.abs(t - 0.45) * 1.5, 0, 1) * 0.35 +
@@ -117,8 +123,10 @@ function classifyLandBiome(
   const hotFlowPenalty = flowSignalDiv5 * model.flowPenaltyScale;
   const scoreDesertHotCore =
     clamp((t - model.hotTempMin) * 2.3, 0, 1) * 0.8 + dry * 0.7 + pSeason * 0.1;
+  // Subtropical anchoring: hot deserts form at ~26° latitude due to Hadley cell subsidence
+  const subtropicalFactor = 0.4 + 0.6 * Math.exp(-((latitude - 0.26) ** 2) / 0.018);
   const scoreDesertHot = allowHotDesert
-    ? scoreDesertHotCore - hotHumidPenalty - hotFlowPenalty
+    ? (scoreDesertHotCore - hotHumidPenalty - hotFlowPenalty) * subtropicalFactor
     : Number.NEGATIVE_INFINITY;
   const scoreDesertCold = allowColdDesert
     ? clamp((model.coldTempMax - t) * 2.2, 0, 1) * 0.65 + dry * 0.65 + elevSea * 0.15
@@ -279,6 +287,7 @@ export function classifyBiomes({
   isRiverByCell,
   isLakeByCell,
   humanImpact,
+  latitudeByCell,
 }: TClassifyBiomesInput): TBiome[] {
   const biomes = new Array<TBiome>(landforms.length);
   const landformCodeByCell = new Uint8Array(landforms.length);
@@ -304,7 +313,8 @@ export function classifyBiomes({
       temperatureSeasonality[cellIndex] as number,
       precipitationSeasonality[cellIndex] as number,
       elevationAboveSea[cellIndex] as number,
-      flowSignalDiv5ByCell[cellIndex] as number
+      flowSignalDiv5ByCell[cellIndex] as number,
+      latitudeByCell[cellIndex] as number
     );
   }
 

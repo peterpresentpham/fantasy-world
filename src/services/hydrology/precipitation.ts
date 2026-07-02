@@ -19,7 +19,12 @@ type TPrecipitationOutput = {
 
 function getLatitudeFactor(y: number, height: number) {
   const latitude = Math.abs((y / Math.max(1, height)) * 2 - 1);
-  return 1 - latitude;
+  // Hadley circulation: ITCZ wet at equator → subtropics dry at 27° → storm tracks wet at 62° → polar dry
+  const itcz = 0.24 * Math.exp(-(latitude * latitude) / 0.015);
+  const subtropicsDry = -0.1 * Math.exp(-((latitude - 0.27) ** 2) / 0.008);
+  const stormTracks = 0.08 * Math.exp(-((latitude - 0.62) ** 2) / 0.03);
+  const poleDry = -0.06 * latitude * latitude;
+  return Math.max(0, 0.14 + itcz + subtropicsDry + stormTracks + poleDry);
 }
 
 function getAlongWindGradient(cell: TCell, cells: TCell[], wind: TWindVector) {
@@ -103,7 +108,7 @@ export function computePrecipitation({
       const recharge =
         waterInfluence[cellIndex] *
         PRECIPITATION_CONFIG.moistureAdvection.localRecharge *
-        (iteration + 1);
+        Math.sqrt(iteration + 1);
       const localMoisture = clamp(
         Math.max(moisture[cellIndex], advectedMoisture + recharge),
         0,

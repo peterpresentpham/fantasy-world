@@ -1,5 +1,5 @@
 import { TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
-import { clamp, createSeededRandom } from 'src/services/utils/math';
+import { clamp } from 'src/services/utils/math';
 
 export interface TErosionResult {
   elevations: Float32Array;
@@ -7,117 +7,80 @@ export interface TErosionResult {
   depositionMap: Float32Array;
 }
 
-function slopeBetween(elevA: number, elevB: number, dx: number, dy: number): number {
-  const dist = Math.hypot(dx, dy);
-  if (dist < 0.0001) return 0;
-  return (elevA - elevB) / dist;
-}
-
+// Stream Power Law: E(i) = K × A(i)^0.5 × S(i)^1.0
+// Physically realistic erosion that carves V-shaped valleys and preserves ridges.
 export function simulateHydraulicErosion(
   elevations: Float32Array,
   cellSites: ReadonlyArray<[number, number]>,
   neighborMap: ReadonlyArray<ReadonlyArray<number>>,
-  seed: string,
+  _seed: string,
   seaLevel: number
 ): TErosionResult {
   const cfg = TOPOGRAPHY_CONFIG.erosion;
-  const random = createSeededRandom(`${seed}:erosion`);
   const cellCount = elevations.length;
-
-  // Track total erosion and deposition per cell for mapping
+  const workingElev = Float32Array.from(elevations);
   const erosionAccum = new Float32Array(cellCount);
   const depositionAccum = new Float32Array(cellCount);
 
-  // Working copy — we modify this as we go
-  const workingElev = Float32Array.from(elevations);
+  // Phase 1: Sort land cells descending by elevation for D8 routing
+  const sortedLand: number[] = [];
+  for (let i = 0; i < cellCount; i += 1) {
+    if (workingElev[i] > seaLevel) sortedLand.push(i);
+  }
+  sortedLand.sort((a, b) => workingElev[b] - workingElev[a]);
 
-  for (let pass = 0; pass < cfg.passCount; pass += 1) {
-    const particleCount = Math.floor(cellCount * 0.15); // ~15% of cells per pass
-
-    for (let p = 0; p < particleCount; p += 1) {
-      // 1. Random starting cell
-      const startIdx = Math.floor(random() * cellCount);
-
-      // Skip water cells (below sea level)
-      if (elevations[startIdx] < seaLevel) continue;
-
-      let currentIdx = startIdx;
-      let waterVolume = cfg.initialWaterVolume;
-      let sediment = 0;
-
-      for (let step = 0; step < cfg.maxParticleSteps; step += 1) {
-        const neighbors = neighborMap[currentIdx];
-        if (neighbors.length === 0) break;
-
-        // 2. Find steepest downhill neighbour
-        let steepestIdx = -1;
-        let steepestSlope = 0;
-        const cx = cellSites[currentIdx][0];
-        const cy = cellSites[currentIdx][1];
-
-        for (const nid of neighbors) {
-          // Only move downhill
-          if (workingElev[nid] >= workingElev[currentIdx]) continue;
-
-          const nx = cellSites[nid][0];
-          const ny = cellSites[nid][1];
-          const slp = slopeBetween(workingElev[currentIdx], workingElev[nid], cx - nx, cy - ny);
-
-          if (slp > steepestSlope) {
-            steepestSlope = slp;
-            steepestIdx = nid;
-          }
-        }
-
-        if (steepestIdx < 0 || steepestSlope < cfg.minSlope) {
-          // No downhill neighbour or too flat
-          // Deposit remaining sediment locally
-          if (sediment > 0) {
-            const deposit = sediment * cfg.depositionRate;
-            workingElev[currentIdx] += deposit;
-            depositionAccum[currentIdx] += deposit;
-            sediment -= deposit;
-          }
-          break;
-        }
-
-        // 3. Calculate sediment capacity (higher slope → more capacity)
-        const capacity = cfg.sedimentCapacityFactor * steepestSlope * waterVolume;
-
-        // 4. Erode or deposit
-        if (sediment > capacity) {
-          // Deposit excess sediment
-          const excess = sediment - capacity;
-          const deposit = excess * cfg.depositionRate;
-          workingElev[steepestIdx] += deposit;
-          depositionAccum[steepestIdx] += deposit;
-          sediment -= deposit;
-        } else {
-          // Erode the downhill cell
-          const deficit = capacity - sediment;
-          const erosionAmount = Math.min(deficit * cfg.erosionRate, workingElev[steepestIdx] * 0.1);
-          workingElev[steepestIdx] -= erosionAmount;
-          erosionAccum[steepestIdx] += erosionAmount;
-          sediment += erosionAmount;
-        }
-
-        // 5. Move to next cell
-        currentIdx = steepestIdx;
-
-        // 6. Evaporate water
-        waterVolume *= 1 - cfg.evaporationRate;
-        if (waterVolume < 0.001) {
-          // Deposit remaining sediment
-          if (sediment > 0) {
-            workingElev[currentIdx] += sediment * cfg.depositionRate;
-            depositionAccum[currentIdx] += sediment * cfg.depositionRate;
-          }
-          break;
-        }
+  // Phase 2: D8 downstream routing — each cell drains to its lowest neighbor
+  const downstream = new Int32Array(cellCount).fill(-1);
+  for (const i of sortedLand) {
+    let lowestNeighbor = -1;
+    let lowestElev = workingElev[i];
+    for (const j of neighborMap[i]) {
+      if (workingElev[j] < lowestElev) {
+        lowestElev = workingElev[j];
+        lowestNeighbor = j;
       }
+    }
+    downstream[i] = lowestNeighbor;
+  }
+
+  // Phase 3: Accumulate upstream flow (process high → low)
+  const flow = new Float32Array(cellCount).fill(1);
+  for (const i of sortedLand) {
+    const d = downstream[i];
+    if (d >= 0) flow[d] += flow[i];
+  }
+
+  // Phase 4: Apply stream power erosion E = K × sqrt(A) × S
+  const K = cfg.erosionRate * 0.018;
+  for (const i of sortedLand) {
+    const d = downstream[i];
+    if (d < 0) continue;
+    const dx = cellSites[i][0] - cellSites[d][0];
+    const dy = cellSites[i][1] - cellSites[d][1];
+    const dist = Math.hypot(dx, dy);
+    if (dist < 0.0001) continue;
+    const slope = Math.max(0, (workingElev[i] - workingElev[d]) / dist);
+    const erosion = clamp(K * Math.sqrt(flow[i]) * slope, 0, 0.06);
+    workingElev[i] = Math.max(seaLevel, workingElev[i] - erosion);
+    erosionAccum[i] += erosion;
+  }
+
+  // Phase 5: Deposition at slope breaks (alluvial fans, river deltas)
+  for (const i of sortedLand) {
+    const d = downstream[i];
+    if (d < 0) continue;
+    const d2 = downstream[d];
+    if (d2 < 0 || workingElev[d2] <= seaLevel) continue;
+    const slope1 = workingElev[i] - workingElev[d];
+    const slope2 = workingElev[d] - workingElev[d2];
+    if (slope1 > 0 && slope2 < slope1 * 0.4) {
+      const deposit = Math.min(slope1 * 0.15, 0.008);
+      workingElev[d] = Math.min(workingElev[d] + deposit, workingElev[i]);
+      depositionAccum[d] += deposit;
     }
   }
 
+  // Normalize maps to [0, 1]
   let maxErosion = 0;
   let maxDeposition = 0;
   for (let i = 0; i < cellCount; i += 1) {
