@@ -1,4 +1,4 @@
-import { BIOME_CONFIG } from 'src/configs/map/terrain';
+import { BIOME_THRESHOLDS as BIOME_CONFIG } from 'src/configs/map/terrain';
 import { TBiome, TLandform } from 'src/global';
 import { clamp } from 'src/services/utils/math';
 

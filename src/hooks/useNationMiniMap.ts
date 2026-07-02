@@ -1,59 +1,22 @@
 'use client';
 
 import { RefObject, useEffect, useMemo } from 'react';
-import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { NATION_COLORS } from 'src/configs/map/common';
-import { drawPolygon } from 'src/services/rendering/canvas/shared';
-import { getNationColor } from 'src/services/utils';
+import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
+import {
+  MINI_MAP_BIOME_DISPLAY,
+  MINI_MAP_TERRAIN_DISPLAY,
+} from 'src/configs/map/miniMapDisplayModes';
 import { TCell, TDelaunayMesh, TDisplaySettings } from 'src/global';
+import { drawPolygon } from 'src/services/rendering/canvas/shared';
+import { computeMiniMapBounds, getNationColor } from 'src/services/utils';
+import { toEdgeKey } from 'src/services/utils/geometry';
 
 type TNationMiniMapDisplay = 'terrain' | 'biome' | 'nation' | 'ethnic';
 
 const DISPLAY_MAP: Record<TNationMiniMapDisplay, TDisplaySettings> = {
-  terrain: {
-    landform: true,
-    biome: false,
-    nationFill: false,
-    nationBorders: false,
-    ethnicFill: false,
-    ethnicBorders: false,
-    provinceBorders: false,
-    population: false,
-    temperature: false,
-    precipitation: false,
-    rainShadow: false,
-    economy: false,
-    rivers: false,
-    labels: false,
-    ethnicLabels: false,
-    cellData: false,
-    landformRelief: false,
-    biomeRelief: false,
-    isometric: false,
-    threeDim: false,
-  },
-  biome: {
-    landform: false,
-    biome: true,
-    nationFill: false,
-    nationBorders: false,
-    ethnicFill: false,
-    ethnicBorders: false,
-    provinceBorders: false,
-    population: false,
-    temperature: false,
-    precipitation: false,
-    rainShadow: false,
-    economy: false,
-    rivers: false,
-    labels: false,
-    ethnicLabels: false,
-    cellData: false,
-    landformRelief: false,
-    biomeRelief: false,
-    isometric: false,
-    threeDim: false,
-  },
+  terrain: MINI_MAP_TERRAIN_DISPLAY,
+  biome: MINI_MAP_BIOME_DISPLAY,
   nation: {
     landform: false,
     biome: false,
@@ -135,8 +98,7 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
         } else {
           colorMap.set(cell.id, '#3f3f46');
         }
-      } else if (cell.nationId !== nationId) {
-        // Check if any neighbor is in this nation -> bordering cell
+      } else {
         for (const nbId of cell.neighbors) {
           const nb = mesh.cells[nbId];
           if (nb && nb.nationId === nationId) {
@@ -151,35 +113,7 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
   }, [mesh.cells, nationId, displaySettings]);
 
   const { canvasW, canvasH, scale, worldCX, worldCY } = useMemo(() => {
-    let minX = Number.POSITIVE_INFINITY;
-    let minY = Number.POSITIVE_INFINITY;
-    let maxX = Number.NEGATIVE_INFINITY;
-    let maxY = Number.NEGATIVE_INFINITY;
-
-    const allCells = [...nationCells, ...bgCells];
-    for (const cell of allCells) {
-      for (const [px, py] of cell.polygon) {
-        if (px < minX) minX = px;
-        if (py < minY) minY = py;
-        if (px > maxX) maxX = px;
-        if (py > maxY) maxY = py;
-      }
-    }
-
-    if (allCells.length === 0) return { canvasW: 0, canvasH: 0, scale: 0, worldCX: 0, worldCY: 0 };
-
-    const pad = 30;
-    const bboxW = maxX - minX + pad * 2;
-    const bboxH = maxY - minY + pad * 2;
-    const s = Math.min(1, 900 / Math.max(bboxW, bboxH));
-
-    return {
-      canvasW: Math.floor(bboxW * s),
-      canvasH: Math.floor(bboxH * s),
-      scale: s,
-      worldCX: (minX + maxX) / 2,
-      worldCY: (minY + maxY) / 2,
-    };
+    return computeMiniMapBounds([...nationCells, ...bgCells]);
   }, [nationCells, bgCells]);
 
   useEffect(() => {
@@ -224,8 +158,15 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
 
     // --- Draw borders based on display mode ---
 
+    function buildEdgeKeySet(polygon: TCell['polygon']) {
+      const keys = new Set<string>();
+      for (let i = 0; i < polygon.length; i++) {
+        keys.add(toEdgeKey(polygon[i], polygon[(i + 1) % polygon.length], { precision: 3 }));
+      }
+      return keys;
+    }
+
     if (displaySettings.provinceBorders) {
-      // Province borders: stroke edges between cells of different provinces
       ctx.strokeStyle = 'rgba(255,255,255,0.35)';
       ctx.lineWidth = 1.0;
       for (const cell of nationCells) {
@@ -233,15 +174,12 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
         for (const nbId of cell.neighbors) {
           const nb = mesh.cells[nbId];
           if (!nb || nb.nationId !== nationId || nb.provinceId === cell.provinceId) continue;
-          // Draw shared edge between cell and nb — find 2 common polygon vertices
+          const nbEdgeKeys = buildEdgeKeySet(nb.polygon);
           const poly = cell.polygon;
           for (let i = 0; i < poly.length; i++) {
             const a = poly[i];
             const b = poly[(i + 1) % poly.length];
-            // Check if both a and b exist in nb's polygon
-            const hasA = nb.polygon.some(([nx, ny]) => Math.hypot(nx - a[0], ny - a[1]) < 0.5);
-            const hasB = nb.polygon.some(([nx, ny]) => Math.hypot(nx - b[0], ny - b[1]) < 0.5);
-            if (hasA && hasB) {
+            if (nbEdgeKeys.has(toEdgeKey(a, b, { precision: 3 }))) {
               const [ax, ay] = toCanvas(a[0], a[1]);
               const [bx, by] = toCanvas(b[0], b[1]);
               ctx.beginPath();
@@ -255,7 +193,6 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
     }
 
     if (displaySettings.ethnicBorders) {
-      // Ethnic borders: stroke edges between cells of different ethnic groups
       ctx.strokeStyle = 'rgba(255,200,100,0.5)';
       ctx.lineWidth = 1.2;
       for (const cell of nationCells) {
@@ -263,13 +200,12 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
         for (const nbId of cell.neighbors) {
           const nb = mesh.cells[nbId];
           if (!nb || nb.nationId !== nationId || nb.ethnicId === cell.ethnicId) continue;
+          const nbEdgeKeys = buildEdgeKeySet(nb.polygon);
           const poly = cell.polygon;
           for (let i = 0; i < poly.length; i++) {
             const a = poly[i];
             const b = poly[(i + 1) % poly.length];
-            const hasA = nb.polygon.some(([nx, ny]) => Math.hypot(nx - a[0], ny - a[1]) < 0.5);
-            const hasB = nb.polygon.some(([nx, ny]) => Math.hypot(nx - b[0], ny - b[1]) < 0.5);
-            if (hasA && hasB) {
+            if (nbEdgeKeys.has(toEdgeKey(a, b, { precision: 3 }))) {
               const [ax, ay] = toCanvas(a[0], a[1]);
               const [bx, by] = toCanvas(b[0], b[1]);
               ctx.beginPath();
@@ -282,20 +218,19 @@ export default function useNationMiniMap({ canvasRef, mesh, nationId, displayMod
       }
     }
 
-    // Outer nation border (separate from background cells)
+    // Outer nation border
     ctx.strokeStyle = 'rgba(255,255,255,0.5)';
     ctx.lineWidth = 1.5;
     for (const cell of nationCells) {
       for (const nbId of cell.neighbors) {
         const nb = mesh.cells[nbId];
         if (!nb || nb.nationId === nationId) continue;
+        const nbEdgeKeys = buildEdgeKeySet(nb.polygon);
         const poly = cell.polygon;
         for (let i = 0; i < poly.length; i++) {
           const a = poly[i];
           const b = poly[(i + 1) % poly.length];
-          const hasA = nb.polygon.some(([nx, ny]) => Math.hypot(nx - a[0], ny - a[1]) < 0.5);
-          const hasB = nb.polygon.some(([nx, ny]) => Math.hypot(nx - b[0], ny - b[1]) < 0.5);
-          if (hasA && hasB) {
+          if (nbEdgeKeys.has(toEdgeKey(a, b, { precision: 3 }))) {
             const [ax, ay] = toCanvas(a[0], a[1]);
             const [bx, by] = toCanvas(b[0], b[1]);
             ctx.beginPath();

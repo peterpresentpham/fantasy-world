@@ -20,7 +20,7 @@ type TProps = {
 };
 
 export default function useMapCanvas({ canvasRef }: TProps) {
-  const { displaySettings } = useMapExplorerStore();
+  const { displaySettings, seaLevel } = useMapExplorerStore();
   const {
     enabled: logisticsEnabled,
     startCellId,
@@ -109,6 +109,7 @@ export default function useMapCanvas({ canvasRef }: TProps) {
         routeCellIds,
         startCellId,
         goalCellId,
+        seaLevel,
       });
     }
   }, [
@@ -133,5 +134,6 @@ export default function useMapCanvas({ canvasRef }: TProps) {
     sortedWaterCells,
     layerPlan,
     mapCellStats,
+    seaLevel,
   ]);
 }

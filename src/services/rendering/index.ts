@@ -6,13 +6,7 @@ import {
   renderRivers,
   renderWaterCells,
 } from './canvas';
-import {
-  drawCountryFill,
-  drawEthnicBorders,
-  drawEthnicFill,
-  drawGrayBorders,
-  drawProvinceBorders,
-} from './canvas/borders';
+import { drawBordersUnified, drawCountryFill, drawEthnicFill } from './canvas/borders';
 import {
   renderIsoBackgroundAndTerrain,
   renderIsoOverlays,
@@ -51,6 +45,7 @@ type TTopDownInputs = {
   routeCellIds: number[];
   startCellId: number | null;
   goalCellId: number | null;
+  seaLevel: number;
 };
 
 export function renderIsometric(
@@ -143,14 +138,22 @@ export function renderTopDown(
     routeCellIds,
     startCellId,
     goalCellId,
+    seaLevel,
   } = inputs;
 
   renderBackground(ctx, width, height);
-  renderWaterCells(ctx, waterCells);
-  renderLandCells(ctx, landCells, displaySettings as TDisplaySettings, layerPlan, mapCellStats);
+  renderWaterCells(ctx, waterCells, seaLevel);
+  renderLandCells(
+    ctx,
+    landCells,
+    displaySettings as TDisplaySettings,
+    layerPlan,
+    mapCellStats,
+    seaLevel
+  );
 
   if (layerPlan.showShadedRelief) {
-    applyShadedRelief(ctx, cells, { intensity: 0.62, verticalExaggeration: 10.5 });
+    applyShadedRelief(ctx, cells);
   }
 
   if (displaySettings.nationFill) drawCountryFill(ctx, cells);
@@ -159,14 +162,16 @@ export function renderTopDown(
 
   if (displaySettings.rivers) renderRivers(ctx, cells);
 
+  if (displaySettings.nationBorders || displaySettings.ethnicBorders) {
+    drawBordersUnified(ctx, cells, {
+      nation: displaySettings.nationBorders,
+      ethnic: displaySettings.ethnicBorders,
+      province: !!displaySettings.nationBorders && !!displaySettings.provinceBorders,
+    });
+  }
   if (displaySettings.nationBorders) {
-    drawGrayBorders(ctx, cells);
     drawUrbanHierarchy(ctx, cells);
   }
-
-  if (displaySettings.ethnicBorders) drawEthnicBorders(ctx, cells);
-  if (displaySettings.nationBorders && displaySettings.provinceBorders)
-    drawProvinceBorders(ctx, cells);
 
   if (displaySettings.ethnicLabels) {
     drawRegionNames(ctx, cells, nations, ethnics, 'ethnic');

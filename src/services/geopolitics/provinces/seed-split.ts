@@ -36,15 +36,14 @@ export function enforceMinProvince(
     if (provinceIds.length >= requiredMinProvinceCount) break;
     if (provinceIds.length === 0) break;
 
+    const pToCells = groupNationCellsByProvince(nationCellIds, provinceOwner);
     let largestProvinceId = provinceIds[0] as number;
-    let largestCells = nationCellIds.filter(
-      (cellId) => provinceOwner[cellId] === largestProvinceId
-    );
+    let largestCells = pToCells.get(largestProvinceId) ?? [];
     for (const provinceId of provinceIds) {
-      const provinceCells = nationCellIds.filter((cellId) => provinceOwner[cellId] === provinceId);
-      if (provinceCells.length > largestCells.length) {
+      const pCells = pToCells.get(provinceId) ?? [];
+      if (pCells.length > largestCells.length) {
         largestProvinceId = provinceId;
-        largestCells = provinceCells;
+        largestCells = pCells;
       }
     }
     if (largestCells.length < 2) break;

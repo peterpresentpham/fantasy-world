@@ -178,7 +178,10 @@ function accumulateFlow(
   for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
     if (isLand[cellIndex] === 0) continue;
     const next = downstream[cellIndex];
-    const slope = next >= 0 ? Math.max(0, filledElevation[cellIndex] - filledElevation[next]) : 0;
+    const slope =
+      next >= 0
+        ? Math.max(0, filledElevation[cellIndex] - filledElevation[next])
+        : Math.max(0, filledElevation[cellIndex]);
     effectiveFlow[cellIndex] = flow[cellIndex] * (1 + slope * 2.5);
   }
 
@@ -306,7 +309,7 @@ function buildRiverGraph(
       visited.add(cursor);
       const existingRiver = riverByCell[cursor];
       if (existingRiver >= 0 && existingRiver !== riverId) {
-        if (effectiveFlow[cursor] <= effectiveFlow[sourceId]) {
+        if (effectiveFlow[cursor] <= flow[cursor]) {
           riverParent.set(existingRiver, riverId);
           tributaries.set(riverId, tributaries.get(riverId) ?? new Set<number>());
           tributaries.get(riverId)?.add(existingRiver);

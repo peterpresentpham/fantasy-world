@@ -32,7 +32,7 @@ const BLEND = TOPOGRAPHY_CONFIG.blend;
 const WARP = TOPOGRAPHY_CONFIG.warp;
 const TECTONIC = TOPOGRAPHY_CONFIG.tectonic;
 
-export function buildReliefSeeds(
+function buildReliefSeeds(
   seed: string,
   key: string,
   count: number,

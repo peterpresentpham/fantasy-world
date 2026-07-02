@@ -37,10 +37,38 @@ export function getRiverStrokeWidth(cell: TCell) {
   return Math.min(4.8, Math.max(0.75, cell.riverWidth || 0.9));
 }
 
-/**
- * Deterministic color from a nation or ethnic ID.
- */
-export function getNationColor(nationId: number | null) {
+export function computeMiniMapBounds(cells: TCell[]) {
+  if (cells.length === 0) return { canvasW: 0, canvasH: 0, scale: 0, worldCX: 0, worldCY: 0 };
+
+  let minX = Number.POSITIVE_INFINITY;
+  let minY = Number.POSITIVE_INFINITY;
+  let maxX = Number.NEGATIVE_INFINITY;
+  let maxY = Number.NEGATIVE_INFINITY;
+
+  for (const cell of cells) {
+    for (const [px, py] of cell.polygon) {
+      if (px < minX) minX = px;
+      if (py < minY) minY = py;
+      if (px > maxX) maxX = px;
+      if (py > maxY) maxY = py;
+    }
+  }
+
+  const pad = 30;
+  const bboxW = maxX - minX + pad * 2;
+  const bboxH = maxY - minY + pad * 2;
+  const s = Math.min(1, 900 / Math.max(bboxW, bboxH));
+
+  return {
+    canvasW: Math.floor(bboxW * s),
+    canvasH: Math.floor(bboxH * s),
+    scale: s,
+    worldCX: (minX + maxX) / 2,
+    worldCY: (minY + maxY) / 2,
+  };
+}
+
+export function getNationColor(nationId: number | null): string {
   if (nationId === null) return '#334155';
   const paletteIndex = Math.abs(nationId) % NATION_COLORS.length;
   return NATION_COLORS[paletteIndex];

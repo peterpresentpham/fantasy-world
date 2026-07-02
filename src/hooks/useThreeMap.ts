@@ -184,6 +184,13 @@ export default function useThreeMap({ containerRef }: TProps) {
     const cellGroup = new THREE.Group();
     const geometries: THREE.BufferGeometry[] = [];
     const vertexElevationCache = new Map<string, number>();
+    const sharedMaterial = new THREE.MeshStandardMaterial({
+      roughness: 0.75,
+      metalness: 0.02,
+      flatShading: false,
+      vertexColors: true,
+      side: THREE.DoubleSide,
+    });
 
     for (const cell of mesh.cells) {
       const landform = cell.isWater ? ('coast' as TLandform) : cell.landform;
@@ -196,14 +203,7 @@ export default function useThreeMap({ containerRef }: TProps) {
       if (geom.attributes.position.count === 0) continue;
       geometries.push(geom);
 
-      const mat = new THREE.MeshStandardMaterial({
-        roughness: 0.75,
-        metalness: 0.02,
-        flatShading: false,
-        vertexColors: true,
-        side: THREE.DoubleSide,
-      });
-      const mesh3D = new THREE.Mesh(geom, mat);
+      const mesh3D = new THREE.Mesh(geom, sharedMaterial);
       mesh3D.castShadow = true;
       mesh3D.receiveShadow = true;
       mesh3D.userData.cellId = cell.id;

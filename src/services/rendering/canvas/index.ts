@@ -1,7 +1,8 @@
-import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
+import { LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { getRiverStrokeWidth } from 'src/services/utils';
 import { TCell, TCellStats, TDisplaySettings } from 'src/global';
 import {
+  getBiomeColor,
   getEconomyColor,
   getPopulationColor,
   getPrecipitationColor,
@@ -9,6 +10,7 @@ import {
   getTemperatureColor,
 } from './heatmap';
 import { drawCellShape, drawRiverCurve } from './primitives';
+import { clamp01, interpolateColor } from './shared';
 
 const T_SITE_MARKER_LIMIT = 4000;
 const T_UNIFORM_LAND_COLOR = '#3f3f46';
@@ -96,9 +98,15 @@ export function renderBackground(context: CanvasRenderingContext2D, width: numbe
   context.fillRect(0, 0, width, height);
 }
 
-export function renderWaterCells(context: CanvasRenderingContext2D, waterCells: TCell[]) {
+export function renderWaterCells(
+  context: CanvasRenderingContext2D,
+  waterCells: TCell[],
+  seaLevel: number
+) {
   for (const cell of waterCells) {
-    drawCellShape(context, cell, LANDFORM_CONFIG[cell.landform].color, 1, T_TRANSPARENT_STROKE, 0);
+    const depthNorm = clamp01((seaLevel - cell.elevation) / Math.max(seaLevel, 0.001));
+    const color = interpolateColor({ r: 26, g: 58, b: 109 }, { r: 5, g: 14, b: 30 }, depthNorm);
+    drawCellShape(context, cell, color, 1, T_TRANSPARENT_STROKE, 0);
   }
 }
 
@@ -107,7 +115,8 @@ export function renderLandCells(
   landCells: TCell[],
   displaySettings: TDisplaySettings,
   layerPlan: TLayerPlan,
-  mapCellStats: TCellStats
+  mapCellStats: TCellStats,
+  seaLevel: number
 ) {
   if (displaySettings.landform || layerPlan.showLandformReliefBase) {
     for (const cell of landCells) {
@@ -124,7 +133,14 @@ export function renderLandCells(
 
   if (displaySettings.biome || layerPlan.showBiomeReliefBase) {
     for (const cell of landCells) {
-      drawCellShape(context, cell, BIOME_CONFIG[cell.biome].color, 1, T_TRANSPARENT_STROKE, 0);
+      drawCellShape(context, cell, getBiomeColor(cell, seaLevel), 1, T_TRANSPARENT_STROKE, 0);
+    }
+    for (const cell of landCells) {
+      const elevNorm = (cell.elevation - seaLevel) / Math.max(1 - seaLevel, 0.001);
+      if (elevNorm < 0.52 || cell.temperature > 0.3) continue;
+      const snowAlpha = clamp01((elevNorm - 0.52) * 2.8 + (0.3 - cell.temperature) * 2.0) * 0.8;
+      if (snowAlpha < 0.05) continue;
+      drawCellShape(context, cell, '#e8f4fd', snowAlpha, T_TRANSPARENT_STROKE, 0);
     }
   }
 
@@ -198,16 +214,26 @@ export function renderLandCells(
 }
 
 export function renderRivers(context: CanvasRenderingContext2D, cells: TCell[]) {
-  context.strokeStyle = '#00f2ff';
   context.lineCap = 'round';
-  context.globalAlpha = 0.96;
-  context.shadowColor = '#7dd3fc';
-  context.shadowBlur = 4;
 
   for (const cell of cells) {
     if (!cell.isRiver || cell.downstreamId === null) continue;
     const downstreamCell = cells[cell.downstreamId];
     if (!downstreamCell) continue;
+
+    const flowNorm = clamp01(cell.flow / 600);
+    const color = interpolateColor({ r: 100, g: 200, b: 232 }, { r: 21, g: 101, b: 192 }, flowNorm);
+    const glowColor = interpolateColor(
+      { r: 147, g: 223, b: 245 },
+      { r: 66, g: 165, b: 245 },
+      flowNorm
+    );
+
+    context.strokeStyle = color;
+    context.globalAlpha = 0.92 + flowNorm * 0.06;
+    context.shadowColor = glowColor;
+    context.shadowBlur = 2 + flowNorm * 4;
+
     drawRiverCurve(context, cell, downstreamCell);
     context.lineWidth = getRiverStrokeWidth(cell);
     context.stroke();

@@ -67,16 +67,36 @@ export function applyShadedRelief(
   }
   const elevationSpan = Math.max(0.0001, maxElevation - minElevation);
 
+  type TReliefCell = {
+    cell: TCell;
+    dropShadowAlpha: number;
+    dropOffset: number;
+    shadowAlpha: number;
+    lightAlpha: number;
+  };
+
+  const reliefCells: TReliefCell[] = [];
   for (const cell of cells) {
     if (cell.isWater) continue;
     const elevationNorm = clamp((cell.elevation - minElevation) / elevationSpan, 0, 1);
-
     const { gx, gy } = getCellSlopeVector(cell, cells);
     const normal = normalize3(-gx * verticalExaggeration, -gy * verticalExaggeration, 1);
     const lambert = normal[0] * light[0] + normal[1] * light[1] + normal[2] * light[2];
+    reliefCells.push({
+      cell,
+      dropShadowAlpha: clamp(elevationNorm * 0.16 + Math.max(0, -lambert) * 0.12, 0.05, 0.22),
+      dropOffset: 0.5 + elevationNorm * 1.45,
+      shadowAlpha: clamp(
+        (Math.max(0, -lambert) * 0.5 + (1 - elevationNorm) * 0.16) * intensity,
+        0,
+        0.34
+      ),
+      lightAlpha: clamp((Math.max(0, lambert) * 0.45 + elevationNorm * 0.24) * intensity, 0, 0.29),
+    });
+  }
 
-    const dropShadowAlpha = clamp(elevationNorm * 0.16 + Math.max(0, -lambert) * 0.12, 0.05, 0.22);
-    const dropOffset = 0.5 + elevationNorm * 1.45;
+  // Pass 1: Drop shadow — per-cell translate requires per-cell save/restore
+  for (const { cell, dropShadowAlpha, dropOffset } of reliefCells) {
     context.save();
     context.translate(shadowOffsetX * dropOffset, shadowOffsetY * dropOffset);
     drawPolygon(context, cell.polygon);
@@ -84,29 +104,25 @@ export function applyShadedRelief(
     context.fillStyle = `rgba(3, 7, 18, ${dropShadowAlpha})`;
     context.fill();
     context.restore();
+  }
 
+  // Pass 2: Multiply shadow — one save/restore for the whole pass
+  context.save();
+  context.globalCompositeOperation = 'multiply';
+  for (const { cell, shadowAlpha } of reliefCells) {
     drawPolygon(context, cell.polygon);
-
-    const shadowAlpha = clamp(
-      (Math.max(0, -lambert) * 0.5 + (1 - elevationNorm) * 0.16) * intensity,
-      0,
-      0.34
-    );
-    context.save();
-    context.globalCompositeOperation = 'multiply';
     context.fillStyle = `rgba(0, 0, 0, ${shadowAlpha})`;
     context.fill();
-    context.restore();
+  }
+  context.restore();
 
-    const lightAlpha = clamp(
-      (Math.max(0, lambert) * 0.45 + elevationNorm * 0.24) * intensity,
-      0,
-      0.29
-    );
-    context.save();
-    context.globalCompositeOperation = 'screen';
+  // Pass 3: Screen highlight — one save/restore for the whole pass
+  context.save();
+  context.globalCompositeOperation = 'screen';
+  for (const { cell, lightAlpha } of reliefCells) {
+    drawPolygon(context, cell.polygon);
     context.fillStyle = `rgba(255, 255, 255, ${lightAlpha})`;
     context.fill();
-    context.restore();
   }
+  context.restore();
 }

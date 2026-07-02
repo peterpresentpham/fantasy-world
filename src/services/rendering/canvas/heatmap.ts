@@ -1,4 +1,6 @@
-import { TRgbColor, clamp01, interpolateColor, toRgbString } from './shared';
+import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
+import { TCell } from 'src/global';
+import { TRgbColor, clamp01, hexToRgb, interpolateColor, toRgbString } from './shared';
 
 export function getPopulationColor(
   population: number,
@@ -45,6 +47,39 @@ export function getRainShadowColor(rainShadow: number) {
   const high: TRgbColor = { r: 146, g: 64, b: 14 };
   const normalized = clamp01(rainShadow);
   return interpolateColor(low, high, normalized);
+}
+
+export function getBiomeColor(cell: TCell, seaLevel: number): string {
+  const base = hexToRgb(BIOME_CONFIG[cell.biome].color);
+  const elevNorm = clamp01((cell.elevation - seaLevel) / Math.max(1 - seaLevel, 0.001));
+
+  const darkFactor = elevNorm * 0.22;
+  const brightFactor = (1 - elevNorm) * 0.06;
+  let tinted: TRgbColor = {
+    r: Math.round(clamp01((base.r * (1 - darkFactor) + 255 * brightFactor) / 255) * 255),
+    g: Math.round(clamp01((base.g * (1 - darkFactor) + 255 * brightFactor) / 255) * 255),
+    b: Math.round(clamp01((base.b * (1 - darkFactor) + 255 * brightFactor) / 255) * 255),
+  };
+
+  const landformBlend =
+    cell.landform === 'mountain' || cell.landform === 'volcanic_field'
+      ? 0.28
+      : cell.landform === 'plateau'
+        ? 0.14
+        : cell.landform === 'coast'
+          ? 0.32
+          : 0;
+
+  if (landformBlend > 0) {
+    const lf = hexToRgb(LANDFORM_CONFIG[cell.landform].color);
+    tinted = {
+      r: Math.round(tinted.r * (1 - landformBlend) + lf.r * landformBlend),
+      g: Math.round(tinted.g * (1 - landformBlend) + lf.g * landformBlend),
+      b: Math.round(tinted.b * (1 - landformBlend) + lf.b * landformBlend),
+    };
+  }
+
+  return toRgbString(tinted);
 }
 
 export function getEconomyColor(economy: number, minEconomy: number, maxEconomy: number) {

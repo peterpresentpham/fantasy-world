@@ -4,15 +4,13 @@ import { useMemo } from 'react';
 import { useMapContext } from 'src/contexts/map.context';
 import { formatPopulation, getNationColor } from 'src/services/utils';
 
-type TProps = Record<string, never>;
-
 type TEthnicPopulationRow = {
   id: number;
   name: string;
   totalPopulation: number;
 };
 
-export default function EthnicPanel(_props: TProps) {
+export default function EthnicPanel() {
   const { mesh } = useMapContext();
 
   const rows = useMemo<TEthnicPopulationRow[]>(() => {

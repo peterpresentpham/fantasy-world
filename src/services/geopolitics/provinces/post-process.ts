@@ -170,11 +170,10 @@ export function minProvinceArea(params: TCellOwnerParams) {
 
     const mandatoryMinProvincePop = getNationMinProvincePop(nationPopulation);
     const enforceMandatoryPopulationFloor = !isIgnore;
+    const provinceToCellsMap = groupNationCellsByProvince(nationCellIds, provinceOwner);
     const smallProvinceIds = Array.from(provinceSize.keys()).filter((provinceId) => {
       const population = provincePopulation.get(provinceId) || 0;
-      const provinceCellIds = nationCellIds.filter(
-        (cellId) => provinceOwner[cellId] === provinceId
-      );
+      const provinceCellIds = provinceToCellsMap.get(provinceId) ?? [];
       const effectiveProvinceSize = computeSize(provinceCellIds, cellsWeight);
       const averageTerrainFactor = getAverageTerrainFactor(provinceCellIds, cellsWeight);
       const terrainAdjustedMinPop =
@@ -211,7 +210,7 @@ export function minProvinceArea(params: TCellOwnerParams) {
     });
 
     for (const provinceId of smallProvinceIds) {
-      const provinceCells = nationCellIds.filter((cellId) => provinceOwner[cellId] === provinceId);
+      const provinceCells = provinceToCellsMap.get(provinceId) ?? [];
       const dominantTerrain = getDominantLandform(provinceCells, cells);
       const currentPopulation = provincePopulation.get(provinceId) || 0;
       const underPopulatedByHardFloor =
@@ -243,11 +242,11 @@ export function minProvinceArea(params: TCellOwnerParams) {
         let bestProvinceId = -1;
         let bestCount = 0;
         const prioritizedCounts =
-          underPopulatedByHardFloor && sameTerrainNeighborCounts.size > 0
+          sameTerrainNeighborCounts.size > 0 && !underPopulatedByHardFloor
             ? sameTerrainNeighborCounts
-            : sameTerrainNeighborCounts.size > 0
-              ? sameTerrainNeighborCounts
-              : mixedTerrainNeighborCounts;
+            : mixedTerrainNeighborCounts.size > 0
+              ? mixedTerrainNeighborCounts
+              : sameTerrainNeighborCounts;
         for (const [candidateProvinceId, count] of prioritizedCounts) {
           if (count > bestCount) {
             bestCount = count;
@@ -286,9 +285,17 @@ export function minProvinceArea(params: TCellOwnerParams) {
     ) {
       const provinceToCells = groupNationCellsByProvince(nationCellIds, provinceOwner);
 
+      const provincePopMap = new Map<number, number>();
+      for (const [pid, cellIds] of provinceToCells) {
+        provincePopMap.set(
+          pid,
+          cellIds.reduce((s, id) => s + cells[id].population, 0)
+        );
+      }
+
       let changed = false;
       for (const [provinceId, provinceCells] of provinceToCells) {
-        const population = provinceCells.reduce((sum, cellId) => sum + cells[cellId].population, 0);
+        const population = provincePopMap.get(provinceId) ?? 0;
         if (population >= Math.floor(nationPopulation * MIN_POP_PERCENT)) continue;
         const dominantTerrain = getDominantLandform(provinceCells, cells);
 
@@ -299,10 +306,7 @@ export function minProvinceArea(params: TCellOwnerParams) {
             if (owner[neighborId] !== nationId) continue;
             const candidateProvinceId = provinceOwner[neighborId];
             if (candidateProvinceId < 0 || candidateProvinceId === provinceId) continue;
-            const mergedPopulation =
-              (provinceToCells
-                .get(candidateProvinceId)
-                ?.reduce((sum, id) => sum + cells[id].population, 0) || 0) + population;
+            const mergedPopulation = (provincePopMap.get(candidateProvinceId) ?? 0) + population;
             if (mergedPopulation > MERGE_POP_CAP) continue;
             const terrainScore = cells[neighborId].landform === dominantTerrain ? 2 : 1;
             if (terrainScore > bestScore) {

@@ -4,15 +4,13 @@ import { useMemo } from 'react';
 import { useMapContext } from 'src/contexts/map.context';
 import { formatPopulation, getNationColor, sumCellPopulation } from 'src/services/utils';
 
-type TProps = Record<string, never>;
-
 type TNationPopulationRow = {
   id: number;
   name: string;
   totalPopulation: number;
 };
 
-export default function NationsPanel(_props: TProps) {
+export default function NationsPanel() {
   const { mesh } = useMapContext();
 
   const totalPopulation = useMemo(() => {

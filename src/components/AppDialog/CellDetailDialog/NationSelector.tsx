@@ -8,8 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from 'src/components/ui/select';
-import { getNationColor } from 'src/services/utils';
 import { TNation } from 'src/global';
+import { getNationColor } from 'src/services/utils';
 
 type TProps = {
   nations: TNation[];

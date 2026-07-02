@@ -1,13 +1,11 @@
+import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/global';
 import { buildGeopolitics } from 'src/services/geopolitics';
 import { buildPopulation } from 'src/services/geopolitics/population';
 import { buildHydrology } from 'src/services/hydrology';
 import { buildTopography } from 'src/services/terrain/buildTopography';
 import { buildMesh } from 'src/services/terrain/mesh';
-import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/global';
 import { CacheManager } from './CacheManager';
 
-// ─── Shared cache instance ─────────────────────────────────────────────────────
-// Using module-level singleton so all MapGenerator instances share the same cache.
 let globalCache: CacheManager | null = null;
 
 function getCache(): CacheManager {
@@ -21,13 +19,6 @@ function getCache(): CacheManager {
 // Keeps a reference to the last-generated mesh to avoid full mesh regen
 // when only display settings change (same config reuses everything).
 let lastMeshResult: { key: string; mesh: TDelaunayMesh } | null = null;
-
-export { CacheManager };
-
-export function clearGenerationCache(): void {
-  getCache().clear();
-  lastMeshResult = null;
-}
 
 export class MapGenerator {
   private readonly config: TGenerationConfig;
@@ -104,35 +95,5 @@ export class MapGenerator {
    */
   getConfig(): TGenerationConfig {
     return this.config;
-  }
-
-  /**
-   * Pre-generate multiple configs and cache them.
-   * Useful for prefetching seeds for the UI (e.g. gallery thumbnails).
-   */
-  static prefetchConfigs(configs: TGenerationConfig[]): void {
-    for (const config of configs) {
-      const generator = new MapGenerator(config);
-      generator.generate();
-    }
-  }
-
-  /**
-   * Generate only up to a specific stage (lazy evaluation).
-   * Returns the full generation result but stages after `stageIndex` may
-   * contain stale/empty data from the previous stage.
-   *
-   * stageIndex:
-   *   0 = mesh only
-   *   1 = mesh + topography
-   *   2 = mesh + topography + hydrology
-   *   3 = mesh + topography + hydrology + population
-   *   4 = all
-   */
-  generateUpTo(): TGenerationStages {
-    const full = this.generate();
-    // Return the full result — the caller can choose to ignore later stages.
-    // This is a placeholder for a true lazy-evaluation implementation.
-    return full;
   }
 }

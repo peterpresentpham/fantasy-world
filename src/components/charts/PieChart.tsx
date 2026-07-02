@@ -13,7 +13,7 @@ type TPieTooltipData<T extends TPieChartData> = {
   percent: string;
 };
 
-export type TProps<T extends TPieChartData> = TBaseChartData & {
+type TProps<T extends TPieChartData> = TBaseChartData & {
   data: T[];
   renderTooltip?: (tooltip: TPieTooltipData<T>) => ReactNode;
 };

@@ -6,7 +6,7 @@ export function clamp01(value: number) {
   return Math.max(0, Math.min(1, value));
 }
 
-export function interpolateChannel(start: number, end: number, factor: number) {
+function interpolateChannel(start: number, end: number, factor: number) {
   return Math.round(start + (end - start) * factor);
 }
 
@@ -29,6 +29,15 @@ export function edgeNoiseValue(edgeKey: string, salt: number) {
     hash = Math.imul(hash, 16777619);
   }
   return (hash >>> 0) / 4294967295;
+}
+
+export function hexToRgb(hex: string): TRgbColor {
+  const h = hex.replace('#', '');
+  return {
+    r: parseInt(h.substring(0, 2), 16),
+    g: parseInt(h.substring(2, 4), 16),
+    b: parseInt(h.substring(4, 6), 16),
+  };
 }
 
 export function drawPolygon(context: CanvasRenderingContext2D, polygon: TPoint[]) {

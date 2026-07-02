@@ -4,10 +4,10 @@ import { XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from 'src/components/ui/button';
 import { ButtonGroup } from 'src/components/ui/button-group';
+import { TDelaunayMesh } from 'src/global';
 import useEthnicStatistic from 'src/hooks/useEthnicStatistic';
 import useNationStatistic from 'src/hooks/useNationStatistic';
 import { formatPopulation } from 'src/services/utils';
-import { TDelaunayMesh } from 'src/global';
 import EthnicDetail from './EthnicDetail';
 import EthnicSelector from './EthnicSelector';
 import NationDetail from './NationDetail';
@@ -31,7 +31,7 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
   const [view, setView] = useState<TView>('nation');
 
   const hasNation = nation !== undefined && nationData !== undefined;
-  const hasEthnic = ethnicData !== null;
+  const hasEthnic = ethnicData !== undefined;
 
   useEffect(() => {
     setSelectedNationId(nationId);

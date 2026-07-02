@@ -31,7 +31,7 @@ export type TNationData = {
   provinces: TNationProvinceData[];
 };
 
-export type TNationReturnData = {
+type TNationReturnData = {
   nation?: TNation;
   data?: TNationData;
 };
@@ -105,13 +105,11 @@ export default function useNationStatistic(
         .sort((a, b) => b.count - a.count)
         .slice(0, 8);
 
-      const ethnicNameById = new Map(
-        mesh.ethnics.map((group) => [String(group.id), group.name] as const)
-      );
+      const ethnicNameById = new Map(mesh.ethnics.map((group) => [group.id, group.name]));
       const ethnics = Array.from(ethnicCounts.entries())
         .map(([id, count]) => ({
           id,
-          name: ethnicNameById.get(String(id)) || `Ethnic #${id}`,
+          name: ethnicNameById.get(id) || `Ethnic #${id}`,
           count,
           percent: toPercent(count, cells.length),
           population: ethnicPopulation.get(id) || 0,

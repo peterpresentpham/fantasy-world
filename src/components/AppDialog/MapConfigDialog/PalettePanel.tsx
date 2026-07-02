@@ -2,8 +2,6 @@
 
 import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 
-type TProps = Record<string, never>;
-
 function renderLegendItem(key: string, item: { label: string; icon: string; color: string }) {
   return (
     <div
@@ -25,7 +23,7 @@ function renderLegendItem(key: string, item: { label: string; icon: string; colo
   );
 }
 
-export default function PalettePanel(_props: TProps) {
+export default function PalettePanel() {
   const landformEntries = Object.entries(LANDFORM_CONFIG);
   const biomeEntries = Object.entries(BIOME_CONFIG);
 

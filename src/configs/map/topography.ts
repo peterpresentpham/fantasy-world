@@ -54,14 +54,7 @@ export const TOPOGRAPHY_CONFIG = {
   },
   mountainRecovery: { quantileStart: 0.86, peakBoostMax: 0.14 },
   erosion: {
-    passCount: 2,
-    sedimentCapacityFactor: 3.0,
     erosionRate: 0.2,
-    depositionRate: 0.3,
-    evaporationRate: 0.05,
-    maxParticleSteps: 30,
-    initialWaterVolume: 1.0,
-    minSlope: 0.0005,
   },
 };
 

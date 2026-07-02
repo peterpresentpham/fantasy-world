@@ -1,6 +1,6 @@
+import { TCell, TPoint } from 'src/global';
 import { getNationColor } from 'src/services/utils';
 import { toEdgeKey } from 'src/services/utils/geometry';
-import { TCell, TPoint } from 'src/global';
 import { drawPolygon, edgeNoiseValue } from './shared';
 
 type TEdgeOwner = { start: TPoint; end: TPoint; cell: TCell };
@@ -123,6 +123,62 @@ function strokeNaturalBorder(
   context.globalAlpha = 0.98;
   context.stroke();
   context.globalAlpha = 1;
+}
+
+export function drawBordersUnified(
+  context: CanvasRenderingContext2D,
+  cells: TCell[],
+  flags: { nation: boolean; ethnic: boolean; province: boolean }
+) {
+  const edgeOwner = new Map<string, TEdgeOwner>();
+
+  for (const cell of cells) {
+    if (cell.polygon.length < 2) continue;
+    for (let index = 0; index < cell.polygon.length; index += 1) {
+      const start = cell.polygon[index];
+      const end = cell.polygon[(index + 1) % cell.polygon.length];
+      const edgeKey = toEdgeKey(start, end, { precision: 3 });
+      const existing = edgeOwner.get(edgeKey);
+      if (!existing) {
+        edgeOwner.set(edgeKey, { start, end, cell });
+        continue;
+      }
+      if (flags.nation && shouldDrawNationBorder(existing.cell, cell)) {
+        strokeNaturalBorder(context, existing.start, existing.end, edgeKey);
+      }
+      if (flags.ethnic && shouldDrawEthnicBorder(existing.cell, cell)) {
+        strokeNaturalBorder(context, existing.start, existing.end, edgeKey);
+      }
+      if (flags.province) {
+        const lc = existing.cell;
+        const rc = cell;
+        if (
+          isLandCell(lc) &&
+          isLandCell(rc) &&
+          lc.nationId !== null &&
+          rc.nationId !== null &&
+          lc.nationId === rc.nationId &&
+          lc.provinceId !== null &&
+          rc.provinceId !== null &&
+          lc.provinceId !== rc.provinceId
+        ) {
+          context.beginPath();
+          context.moveTo(existing.start[0], existing.start[1]);
+          context.lineTo(existing.end[0], existing.end[1]);
+          context.strokeStyle = '#1f2937';
+          context.lineWidth = 0.5;
+          context.setLineDash([3, 3]);
+          context.globalAlpha = 1;
+          context.shadowColor = '#030712';
+          context.shadowBlur = 2.2;
+          context.stroke();
+          context.shadowBlur = 0;
+          context.setLineDash([]);
+          context.globalAlpha = 1;
+        }
+      }
+    }
+  }
 }
 
 export function drawGrayBorders(context: CanvasRenderingContext2D, cells: TCell[]) {

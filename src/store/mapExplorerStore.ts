@@ -104,7 +104,6 @@ export const useMapExplorerStore = create<TMapExplorerStore>()(
           hoverClientPoint: null,
           resetCounter: Date.now(),
         });
-        localStorage.removeItem('map-explorer');
       },
     }),
     {

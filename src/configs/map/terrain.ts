@@ -1,4 +1,4 @@
-export const BIOME_CONFIG = {
+export const BIOME_THRESHOLDS = {
   desert: {
     hotTempMin: 0.62,
     hotAridityMax: 0.32,

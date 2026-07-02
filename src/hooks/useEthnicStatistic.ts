@@ -13,7 +13,7 @@ export type TEthnicData = {
   biomes: TTerranStatisticData[];
 };
 
-export type TEthnicReturnData = {
+type TEthnicReturnData = {
   data?: TEthnicData;
 };
 
@@ -59,14 +59,16 @@ export default function useEthnicStatistic(
         count,
         percent: toPercent(count, ethnicCells.length),
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
     const biomes = Array.from(biomeCount.entries())
       .map(([terrain, count]) => ({
         terrain,
         count,
         percent: toPercent(count, ethnicCells.length),
       }))
-      .sort((a, b) => b.count - a.count);
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
 
     return { ethnics, ethnicCells, totalPopulation, nations, landforms, biomes };
   }, [ethnicId, mesh.cells, mesh.ethnics, mesh.nations]);
