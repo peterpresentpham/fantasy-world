@@ -565,8 +565,16 @@ function buildSeedStates(owner: Int32Array, cost: Float64Array) {
   return seeds;
 }
 
+function buildLandCellIds(cells: TCell[]): number[] {
+  const ids: number[] = [];
+  for (const cell of cells) {
+    if (isLand(cell)) ids.push(cell.id);
+  }
+  return ids;
+}
+
 export function buildLandNations(cells: TCell[], seed: string, nationCount: number) {
-  const landCellCount = cells.filter(isLand).length;
+  const landCellCount = buildLandCellIds(cells).length;
   const numOfNation = getNationCount(nationCount, landCellCount);
   const connectivity = buildConnectivityContext(cells);
   const minSeedComponentSize = GEOPOLITICAL_CONFIG.minLandCells + 6;
@@ -665,8 +673,13 @@ export function alignNaturalTerrainClusters(cells: TCell[], owner: Int32Array) {
   }
 }
 
-export function enforceMinNationArea(cells: TCell[], owner: Int32Array, minNationCount = 0) {
-  const landCellIds = cells.filter(isLand).map((cell) => cell.id);
+export function enforceMinNationArea(
+  cells: TCell[],
+  owner: Int32Array,
+  minNationCount = 0,
+  precomputedLandCellIds?: number[]
+) {
+  const landCellIds = precomputedLandCellIds ?? buildLandCellIds(cells);
   const minNationCells = Math.max(
     GEOPOLITICAL_CONFIG.minLandCells,
     Math.floor(landCellIds.length * GEOPOLITICAL_CONFIG.minLandRatio)
@@ -883,8 +896,7 @@ function getUnclaimedLandCount(cells: TCell[], owner: Int32Array) {
   return count;
 }
 
-function getSmallNationCount(cells: TCell[], owner: Int32Array) {
-  const landCellIds = cells.filter(isLand).map((cell) => cell.id);
+function getSmallNationCount(landCellIds: number[], owner: Int32Array) {
   const minNationCells = Math.max(
     GEOPOLITICAL_CONFIG.minLandCells,
     Math.floor(landCellIds.length * GEOPOLITICAL_CONFIG.minLandRatio)
@@ -900,18 +912,19 @@ export function finalizeNationBorders(
   maxPasses = 3
 ) {
   const shouldLogMetrics = process.env.NODE_ENV !== 'production';
+  const landCellIds = buildLandCellIds(cells);
 
   for (let pass = 0; pass < maxPasses; pass += 1) {
     const beforeUnclaimed = getUnclaimedLandCount(cells, owner);
-    const beforeSmallNationCount = getSmallNationCount(cells, owner);
+    const beforeSmallNationCount = getSmallNationCount(landCellIds, owner);
 
     fillUnclaimedLand(cells, owner);
     ensureAllLandClaimed(cells, owner);
-    enforceMinNationArea(cells, owner, nationCount);
+    enforceMinNationArea(cells, owner, nationCount, landCellIds);
     ensureAllLandClaimed(cells, owner);
 
     const afterUnclaimed = getUnclaimedLandCount(cells, owner);
-    const afterSmallNationCount = getSmallNationCount(cells, owner);
+    const afterSmallNationCount = getSmallNationCount(landCellIds, owner);
     if (shouldLogMetrics) {
       console.debug('[nation:reconcile]', {
         pass,

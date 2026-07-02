@@ -50,7 +50,9 @@ function pickEthnicCoreSeeds(cells: TCell[], cellIds: number[], count: number, s
     const point = cells[candidate.cellId].site;
     const tooClose = seeds.some((seedCellId) => {
       const seedPoint = cells[seedCellId].site;
-      return Math.hypot(point[0] - seedPoint[0], point[1] - seedPoint[1]) < 70;
+      const dx = point[0] - seedPoint[0];
+      const dy = point[1] - seedPoint[1];
+      return dx * dx + dy * dy < 4900;
     });
     if (tooClose) continue;
     seeds.push(candidate.cellId);

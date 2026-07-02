@@ -177,16 +177,16 @@ export function buildPopulation({ mesh, seed }: TPopulationParams): TDelaunayMes
     )
   );
   const citySeeds: number[] = [];
+  const minSeedDistSq = POP_MODEL.urban.minSeedDistance * POP_MODEL.urban.minSeedDistance;
 
   for (const candidate of urbanCandidates) {
     if (citySeeds.length >= cityCount) break;
     const point = cells[candidate.id].site;
     const tooClose = citySeeds.some((seedId) => {
       const seedPoint = cells[seedId].site;
-      return (
-        Math.hypot(point[0] - seedPoint[0], point[1] - seedPoint[1]) <
-        POP_MODEL.urban.minSeedDistance
-      );
+      const dx = point[0] - seedPoint[0];
+      const dy = point[1] - seedPoint[1];
+      return dx * dx + dy * dy < minSeedDistSq;
     });
     if (tooClose) continue;
     citySeeds.push(candidate.id);
@@ -196,12 +196,16 @@ export function buildPopulation({ mesh, seed }: TPopulationParams): TDelaunayMes
     const seedPoint = cells[seedId].site;
     const radius = POP_MODEL.urban.minRadius + random() * POP_MODEL.urban.radiusRange;
     const boost = POP_MODEL.urban.minBoost + random() * POP_MODEL.urban.boostRange;
+    const radiusSq = radius * radius;
 
     for (let cellId = 0; cellId < cells.length; cellId += 1) {
       const cell = cells[cellId];
       if (cell.isWater) continue;
-      const distance = Math.hypot(cell.site[0] - seedPoint[0], cell.site[1] - seedPoint[1]);
-      if (distance > radius) continue;
+      const dx = cell.site[0] - seedPoint[0];
+      const dy = cell.site[1] - seedPoint[1];
+      const distanceSq = dx * dx + dy * dy;
+      if (distanceSq > radiusSq) continue;
+      const distance = Math.sqrt(distanceSq);
       const distanceFactor = 1 - distance / radius;
       const suitability = climateSuitabilityByCell[cellId] as number;
       const settlement = humanSettlementByCell[cellId] as number;

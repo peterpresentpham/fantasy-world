@@ -15,7 +15,8 @@ const TOOLTIP_DELAY_MS = 300;
 type TGroupedRow = { label: string; value: string; accent?: boolean };
 
 export default function HoverCellOverview() {
-  const { hoverIndex, displaySettings } = useMapExplorerStore();
+  const hoverIndex = useMapExplorerStore((s) => s.hoverIndex);
+  const cellDataEnabled = useMapExplorerStore((s) => s.displaySettings.cellData);
   const { mesh } = useMapContext();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [delayedHoverIndex, setDelayedHoverIndex] = useState<number | null>(null);
@@ -106,7 +107,7 @@ export default function HoverCellOverview() {
     };
   }, [canvasRect, cell, mesh.width, mesh.height, viewportSize]);
 
-  if (!displaySettings.cellData || !description || !cell) return null;
+  if (!cellDataEnabled || !description || !cell) return null;
 
   return (
     <div className="pointer-events-none fixed z-1000000" style={positionStyle}>

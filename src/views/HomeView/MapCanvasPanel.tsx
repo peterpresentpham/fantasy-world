@@ -1,6 +1,6 @@
 'use client';
 
-import { MouseEvent, useRef, useState } from 'react';
+import { MouseEvent, useCallback, useRef, useState } from 'react';
 import CellDetailDialog from 'src/components/AppDialog/CellDetailDialog';
 import { useMapContext } from 'src/contexts/map.context';
 import useMapCanvas from 'src/hooks/useMapCanvas';
@@ -17,7 +17,10 @@ export default function MapCanvasPanel() {
   const [selectedNationId, setSelectedNationId] = useState<number | null>(null);
   const [selectedEthnicId, setSelectedEthnicId] = useState<number | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const { setHoverIndex, setHoverClientPoint, displaySettings } = useMapExplorerStore();
+  const setHoverIndex = useMapExplorerStore((s) => s.setHoverIndex);
+  const setHoverClientPoint = useMapExplorerStore((s) => s.setHoverClientPoint);
+  const isIso = useMapExplorerStore((s) => s.displaySettings.isometric);
+  const isThree = useMapExplorerStore((s) => s.displaySettings.threeDim);
   const {
     enabled: logisticsEnabled,
     handleMapCellClick,
@@ -25,45 +28,59 @@ export default function MapCanvasPanel() {
   } = useLogisticsGameStore();
   const { mesh, isGenerating, handlePointerMove } = useMapContext();
   const { cells, width, height } = mesh;
-  const isIso = displaySettings.isometric;
-  const isThree = displaySettings.threeDim;
   const show2D = !isThree;
 
   useMapCanvas({ canvasRef: baseCanvasRef });
   useMapOverlay({ canvasRef: overlayCanvasRef });
   useThreeMap({ containerRef: threeContainerRef });
 
-  function resolveCanvasPoint(event: MouseEvent<HTMLCanvasElement>) {
-    const point = getCanvasPoint(event, width, height);
-    if (isIso) {
-      return { x: point.x, y: point.y };
-    }
-    return point;
-  }
+  const resolveCanvasPoint = useCallback(
+    (event: MouseEvent<HTMLCanvasElement>) => {
+      const point = getCanvasPoint(event, width, height);
+      if (isIso) {
+        return { x: point.x, y: point.y };
+      }
+      return point;
+    },
+    [width, height, isIso]
+  );
 
-  function onCanvasPanelClick(event: MouseEvent<HTMLCanvasElement>) {
-    const point = resolveCanvasPoint(event);
-    const clickedId = mesh.delaunay.find(point.x, point.y);
-    if (clickedId < 0 || cells[clickedId]?.isWater) return;
+  const onCanvasPanelClick = useCallback(
+    (event: MouseEvent<HTMLCanvasElement>) => {
+      const point = resolveCanvasPoint(event);
+      const clickedId = mesh.delaunay.find(point.x, point.y);
+      if (clickedId < 0 || cells[clickedId]?.isWater) return;
 
-    const clickedCell = cells[clickedId];
-    if (!clickedCell) return;
+      const clickedCell = cells[clickedId];
+      if (!clickedCell) return;
 
-    if (logisticsEnabled) {
-      handleMapCellClick(clickedId);
-      queueMicrotask(() => {
-        recalculateRoute(mesh);
-      });
-      return;
-    }
+      if (logisticsEnabled) {
+        handleMapCellClick(clickedId);
+        queueMicrotask(() => {
+          recalculateRoute(mesh);
+        });
+        return;
+      }
 
-    const nationId = clickedCell.nationId ?? null;
-    const ethnicId = clickedCell.ethnicId ?? null;
-    if (nationId === null && ethnicId === null) return;
-    setSelectedNationId(nationId);
-    setSelectedEthnicId(ethnicId);
-    setDialogOpen(true);
-  }
+      const nationId = clickedCell.nationId ?? null;
+      const ethnicId = clickedCell.ethnicId ?? null;
+      if (nationId === null && ethnicId === null) return;
+      setSelectedNationId(nationId);
+      setSelectedEthnicId(ethnicId);
+      setDialogOpen(true);
+    },
+    [
+      resolveCanvasPoint,
+      mesh,
+      cells,
+      logisticsEnabled,
+      handleMapCellClick,
+      recalculateRoute,
+      setSelectedNationId,
+      setSelectedEthnicId,
+      setDialogOpen,
+    ]
+  );
 
   return (
     <div className="flex h-full w-full items-center justify-center overflow-hidden p-2 sm:p-0">

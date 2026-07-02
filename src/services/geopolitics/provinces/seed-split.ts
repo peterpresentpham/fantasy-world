@@ -297,14 +297,13 @@ export function buildNationProvinces(cells: TCell[], owner: Int32Array, seed: st
 
           const seedCellId = seeds[provinceId - nationStartProvinceId];
           let farthestCellId = seedCellId;
-          let farthestDistance = -1;
+          let farthestDistanceSq = -1;
           for (const cellId of provinceCells) {
-            const distance = Math.hypot(
-              cells[cellId].site[0] - cells[seedCellId].site[0],
-              cells[cellId].site[1] - cells[seedCellId].site[1]
-            );
-            if (distance > farthestDistance) {
-              farthestDistance = distance;
+            const dx = cells[cellId].site[0] - cells[seedCellId].site[0];
+            const dy = cells[cellId].site[1] - cells[seedCellId].site[1];
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq > farthestDistanceSq) {
+              farthestDistanceSq = distanceSq;
               farthestCellId = cellId;
             }
           }

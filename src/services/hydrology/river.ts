@@ -1,4 +1,5 @@
 import { HYDROLOGY_CONFIG, RIVER_CONFIG } from 'src/configs/map/hydrology';
+import { TFifoQueue } from 'src/services/utils/collections';
 import { createSeededRandom } from 'src/services/utils/math';
 import { TCell, TPoint, TRiver, TRiverEndType, TRiverKind } from 'src/global';
 
@@ -189,11 +190,12 @@ function buildPathToWater(cells: TCell[], startCellId: number, riverByCell: Int3
   const visited = new Uint8Array(cells.length);
   const previous = new Int32Array(cells.length);
   previous.fill(-1);
-  const queue: number[] = [startCellId];
+  const queue = new TFifoQueue<number>();
+  queue.enqueue(startCellId);
   visited[startCellId] = 1;
 
-  while (queue.length > 0) {
-    const current = queue.shift() as number;
+  while (queue.size > 0) {
+    const current = queue.dequeue() as number;
     const currentCell = cells[current];
 
     for (const neighborId of currentCell.neighbors) {
@@ -217,7 +219,7 @@ function buildPathToWater(cells: TCell[], startCellId: number, riverByCell: Int3
       if (riverByCell[neighborId] >= 0 && neighborId !== startCellId) continue;
       visited[neighborId] = 1;
       previous[neighborId] = current;
-      queue.push(neighborId);
+      queue.enqueue(neighborId);
     }
   }
 
