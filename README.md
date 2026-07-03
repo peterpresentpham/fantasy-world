@@ -13,59 +13,55 @@ Production URL: [https://fantasy.peter-present.xyz/](https://fantasy.peter-prese
 - Generate repeatable worlds from a seed — same seed = same map
 - Choose from **6 terrain presets**: `balanced`, `ranges`, `rifted`, `archipelago`, `volcanic`, `continental`
 - Adjust sea level, temperature offset/contrast, precipitation scale/offset, human impact, nation count, cell count
+- **Manual terrain painting**: select a landform type and click/drag cells to override terrain with natural noise-driven elevation
 - Interactive map with toggleable layers: Landform, Biome, Population (heatmap), Temperature (heatmap), Precipitation, Rain Shadow, Economy (heatmap), Rivers, Nation borders/fill, Province borders, Ethnic borders/fill/labels, Labels, Cell data
-- Hover for cell-level stats, click to open nation/ethnic detail dialogs
+- Hover for cell-level stats; click to open nation/ethnic detail dialogs
 - Find optimal logistics routes between two points (Dijkstra)
 - Export/Import world snapshots (JSON)
-- 3D isometric view and Three.js 3D globe rendering
+- 3D isometric view and Three.js 3D rendering
 
 ---
 
 ## 🏗 How World Generation Works
 
-The pipeline runs in **5 sequential stages** via `MapGenerator`:
+The pipeline runs in **5 sequential stages** via `MapGenerator` (`src/services/pipeline/MapGenerator.ts`):
 
 ### 1. Mesh
 
-Jittered grid points → Delaunay triangulation → Voronoi diagram via **d3-delaunay**. Each cell has a site, polygon, vertices, edges, and neighbors. Default: **15,000 cells** (configurable 4,000–15,000).
+Jittered grid points → Delaunay triangulation → Voronoi diagram via **d3-delaunay**. Each cell has a site, polygon, vertices, edges, and neighbors. Configurable 4,000–15,000 cells.
 
 ### 2. Topography (`src/services/terrain/`)
 
-- **Noise**: Multi-octave noise (FBM, Ridged, Billow) + domain warping via `simplex2D`
-- **Tectonic boundaries**: Collision/rift line systems with seed-based positioning
-- **Preset shapes**: Range chains with foothills, escarpments + plateaus, archipelago seed islands, volcanic hotspots
-- **Post-processing**: Edge shelf (coastal shelf), hill bands, valley bands, elevation smoothing
-- **Erosion**: Thermal erosion with slope-based transport + isostasy (Airy compensation)
-- **6 presets**: `balanced` (moderate mixed terrain), `ranges` (mountain chains), `rifted` (escapments+rifting), `archipelago` (island chains), `volcanic` (hotspots), `continental` (broad plates)
+- **Noise**: Multi-octave fBm, Ridged, and Billow fractals + domain warping via `simplex2D` (`noise.ts`)
+- **Tectonic plates**: Voronoi plate generation → convergent/divergent/transform boundary classification → isostatic elevation baseline + uplift/rift (`tectonics.ts`, `isostasy.ts`)
+- **Elevation blend**: 7-component weighted sum — macro noise, secondary noise, ridged noise, billow noise, erosion mask, tectonic uplift, coastal noise (`computeElevation.ts`)
+- **Preset shaping**: range chains, valley bands, plateau clusters, island seeds, volcanic hotspots (`preset.ts`, `shape.ts`)
+- **Post-processing**: high-mountain reinforcement (quadratic boost for top 14% peaks), Stream Power hydraulic erosion (`erosion.ts`)
+- **6 presets**: `balanced`, `ranges`, `rifted`, `archipelago`, `volcanic`, `continental`
 
-Elevation outputs classified into **15 terrain types** (`TTerrain`), then resolved to **10 landforms** (`TLandform`):
+Elevation classified into **10 landforms** (`TLandform`):
 
-| Landform         | Description                        |
-| ---------------- | ---------------------------------- |
-| `marine_deep`    | Deep ocean                         |
+| Landform | Description |
+|---|---|
+| `marine_deep` | Deep ocean |
 | `marine_shallow` | Shallow waters / continental shelf |
-| `coast`          | Coastal land/beach zone            |
-| `lake`           | Inland lake                        |
-| `plain`          | Flat lowlands                      |
-| `valley`         | Low-lying areas between hills      |
-| `hills`          | Rolling terrain                    |
-| `mountain`       | High elevation peaks               |
-| `plateau`        | Elevated flat regions              |
-| `volcanic_field` | Volcanic highlands                 |
+| `coast` | Coastal land/beach zone |
+| `lake` | Inland lake |
+| `plain` | Flat lowlands |
+| `valley` | Low-lying area between high terrain |
+| `hills` | Rolling terrain |
+| `mountain` | High elevation peaks |
+| `plateau` | Elevated flat regions |
+| `volcanic_field` | Volcanic highlands |
 
 ### 3. Hydrology (`src/services/hydrology/`)
 
-- **Temperature**: Latitude cooling + elevation lapse rate + maritime moderation (water influence)
-- **Wind**: 3-zone global circulation model (trade winds, westerlies, polar easterlies) with cell-based directional field
-- **Precipitation**: Moisture advection from wind + orographic uplift (mountain barriers) + rain shadow effect on lee side
-- **Rivers**: `generateRivers()` pipeline:
-  1. `prepareTerrain()` — adjust coastal elevations, build land mask
-  2. `fillDepressions()` — iterative depression filling with epsilon
-  3. `accumulateFlow()` — flow direction + accumulation from precipitation
-  4. `buildRiverGraph()` — source selection → downstream tracing → confluence resolution → tail extension → meander insertion → width smoothing → bank geometry construction
-  - River hierarchy: `river` (peakFlow ≥ 150) → `fork` (≥ 80) → `branch` (≥ 45) → `creek`
-- **Lakes**: Formed at elevation sinks → expanded with precipitation/rain-shadow constraints → filtered to 12 largest lakes → inland water classification
-- **Erosion**: Slope-based erosion & sediment deposition (pre-climate)
+- **Temperature**: Latitude cooling + elevation lapse rate + maritime moderation (`temperature.ts`)
+- **Wind**: 3-zone global Hadley-cell circulation (trade winds, westerlies, polar easterlies) with per-cell directional field (`wind.ts`)
+- **Precipitation**: Moisture advection from wind + orographic uplift + rain shadow on lee side (`precipitation.ts`)
+- **Rivers**: D8 flow routing → depression filling → precipitation-weighted accumulation → named river tracing with confluence resolution + width smoothing (`river.ts`)
+- **Lakes**: Elevation-sink expansion → filtered to 12 largest → inland water classification (`lakes.ts`)
+- **Landform & biome classification**: Score-based competition between candidates using elevation, slope, flow, and climate signals (`landformClassifier.ts`, `biomeClassifier.ts`)
 
 Climate outputs classified into **16 biomes** (`TBiome`):
 
@@ -73,24 +69,42 @@ Climate outputs classified into **16 biomes** (`TBiome`):
 
 ### 4. Population (`src/services/geopolitics/population.ts`)
 
-- **Water access**: BFS distance-decay to ocean cells → rating per cell
-- **Climate suitability**: Ideal temperature/precipitation curves with tolerance
-- **Landform/biome factors**: `BIOME_CONFIG.populationFactor` + `humanSettlementBoost()` (plain=1.35, wetland=0.85, desert=0.75)
-- **Noise**: Seeded jitter per cell
-- **Urban sprawl**: Seed cities (scored by population + suitability) → radial boost with distance decay → 2 passes of neighbor averaging
-- **Economy**: Derived from population _ landform factor _ water access factor \* population/water synergy, then pow(1.12)
+- BFS water-access scoring (ocean + river/lake distance decay)
+- Climate suitability curves (ideal temperature/precipitation)
+- Biome `populationFactor` + landform `humanSettlementBoost`
+- Urban seed placement → radial Gaussian boost → 2-pass neighbor averaging
+- Economy derived from population × landform × water access synergy
 
 ### 5. Geopolitics (`src/services/geopolitics/`)
 
-- **Nations** (cost-based frontier expansion):
-  1. Seed selection via `selectNationSeeds()` — scored suitability + component-aware soft geography bias
-  2. Floor expansion — grow nations toward minimum size first
-  3. `runMultiSourceExpansion()` — Dijkstra-like frontier with terrain/biome/noise costs
-  4. Post-processing: `alignNaturalTerrainClusters()`, `limitMountainSplit()`, `enforceMinNationArea()`, `enforceMainlandContiguity()`, `finalizeNationBorders()`, `diversifySmallNationSizes()`
-- **Provinces**: Per-nation scored seed placement → cost expansion → split over-cap provinces (20 iterations) → population balancing (~500K target, ~1.5M max) → contiguity enforcement
-- **Ethnic regions**: Per-landmass seeded expansion → nation dominance enforcement → cross-border blending → mountain fragmentation → smoothing
-- **Capitals**: Weighted by population, economy, centrality, safety (`LANDFORM_CONFIG.safetyScore`), terrain flatness
-- **Economic hubs**: Scored by economy, landform suitability, and water access
+- **Nations** (`nations.ts`): Scored seed selection → cost-based Voronoi frontier expansion → post-processing passes (terrain alignment, mountain split limits, contiguity enforcement, size diversification)
+- **Provinces** (`provinces/`): Per-nation seed placement → cost expansion → population-cap enforcement → contiguity repair
+- **Ethnic regions** (`ethnic.ts`): Per-landmass seeded expansion → nation dominance → mountain fragmentation → border smoothing
+- **Capitals & hubs** (`capitals.ts`): Weighted by population, economy, centrality, terrain safety and flatness
+- Maritime zones: territorial/international waters via BFS from coasts
+
+---
+
+## ✏ Manual Terrain Painting
+
+A brush tool lets you override generated terrain without re-running the pipeline:
+
+1. Click **"✏ Edit Terrain"** (top-left of the map)
+2. Select a landform type from the picker
+3. Click or drag over cells — each cell receives a noise-driven elevation appropriate for that landform
+
+Elevation targets per landform (with fractal noise variation for naturalness):
+
+| Landform | Strategy |
+|---|---|
+| `mountain` | elevation ≥ 0.90 (triggers classifier hard-override) |
+| `plateau` | seaLevel + 0.48, very low noise (flat surface needed for plateau bonus) |
+| `hills` | seaLevel + 0.22, ±0.05 noise (slope variation prevents plain misclassification) |
+| `plain` | seaLevel + 0.10, low noise |
+| `valley` | seaLevel + 0.06, works best where surrounding cells are already higher |
+| `coast` | seaLevel + 0.008 |
+
+Immediate neighbors are lightly blended (12%) to soften cliff edges. "Clear All Edits" restores original elevations. Overrides are lost on regeneration.
 
 ---
 
@@ -98,44 +112,45 @@ Climate outputs classified into **16 biomes** (`TBiome`):
 
 Canvas-rendered with toggleable layers:
 
-| Layer                      | Description                                        |
-| -------------------------- | -------------------------------------------------- |
-| Landform                   | Colored by landform type + optional relief shading |
-| Biome                      | Colored by biome classification                    |
-| Population                 | Heatmap (green → red)                              |
-| Temperature                | Heatmap (blue → red)                               |
-| Precipitation              | Blue intensity                                     |
-| Rain Shadow                | Gray-scale orographic effect                       |
-| Economy                    | Heatmap                                            |
-| Rivers                     | Blue with glow, width-scaled by river order        |
-| Nation Borders/Fill        | Colored by nation, with stroke borders             |
-| Province Borders           | Sub-national boundaries                            |
-| Ethnic Borders/Fill/Labels | Ethnic region coloring                             |
-| Labels                     | Nation/ethnic names                                |
-| Cell Data                  | Detailed per-cell popup                            |
+| Layer | Description |
+|---|---|
+| Landform | Colored by landform type + optional shaded relief |
+| Biome | Colored by biome classification |
+| Population | Heatmap (green → red) |
+| Temperature | Heatmap (blue → red) |
+| Precipitation | Blue intensity |
+| Rain Shadow | Grayscale orographic effect |
+| Economy | Heatmap |
+| Rivers | Blue with glow, width-scaled by flow |
+| Nation Borders/Fill | Per-nation color with natural wavy borders |
+| Province Borders | Sub-national dashed boundaries |
+| Ethnic Borders/Fill/Labels | Ethnic region coloring |
+| Labels | Nation/ethnic names at centroid |
+| Cell Data | Per-cell hover popup |
 
-Includes **3D isometric** mode (pseudo-3D via offsets) and **Three.js 3D** globe rendering.
+Also includes **isometric** mode (pseudo-3D offset projection) and **Three.js 3D** rendering with vertex-colored terrain mesh.
 
-Dialogs: **Map Config** (settings + layers + export/import), **Nation Detail** (population, economy, ethnicity pie chart via @visx), **Ethnic Detail** (breakdown, spread), **Route Finder** (Dijkstra logistics), and **Hover Tooltip** (cell-level stats).
+Dialogs: **Map Config** (settings, layers, export/import), **Nation Detail** (population, economy, ethnicity breakdown with `@visx` pie charts), **Ethnic Detail**, **Route Finder** (Dijkstra logistics game), and **Cell Hover Tooltip**.
 
 ---
 
 ## 🛠 Tech Stack
 
-| Technology       | Version  | Purpose            |
-| ---------------- | -------- | ------------------ |
-| **Next.js**      | 16.2.4   | App Router         |
-| **React**        | 19.2.0   | UI                 |
-| **TypeScript**   | ^5       | Strict mode        |
-| **Tailwind CSS** | v4       | Styling            |
-| **Zustand**      | ^5.0.12  | State (persistent) |
-| **d3-delaunay**  | ^6.0.4   | Voronoi/Delaunay   |
-| **Radix UI**     | ^1.4.3   | UI primitives      |
-| **Lucide React** | ^1.12.0  | Icons              |
-| **@visx**        | ^3.12.0  | Charts             |
-| **Three.js**     | ^0.175.0 | 3D rendering       |
-| **Vitest**       | ^4.1.5   | Testing            |
-| **Canvas API**   | —        | Map rendering      |
+| Technology | Version | Purpose |
+|---|---|---|
+| **Next.js** | 16.2.4 | App Router, SSR |
+| **React** | 19.2.4 | UI |
+| **TypeScript** | ^5 | Strict mode |
+| **Tailwind CSS** | ^4 | Styling |
+| **Zustand** | ^5.0.12 | State management (persistent) |
+| **d3-delaunay** | ^6.0.4 | Voronoi/Delaunay mesh |
+| **Radix UI** | ^1.4.3 | UI primitives |
+| **Lucide React** | ^1.12.0 | Icons |
+| **@visx** | ^3.12.0 | Charts (pie, group) |
+| **Three.js** | ^0.184.0 | 3D rendering |
+| **shadcn** | ^4.6.0 | Component system |
+| **Vitest** | ^4.1.5 | Testing |
+| **Canvas API** | — | Map rendering |
 
 ---
 
@@ -154,7 +169,7 @@ yarn dev          # Dev server
 yarn build        # Production build
 yarn start        # Production server
 yarn test         # Run tests
-yarn bench:map    # Benchmark
+yarn bench:map    # Benchmark map generation
 yarn eslint       # Lint
 yarn format       # Prettier
 ```
@@ -163,20 +178,21 @@ yarn format       # Prettier
 
 ## 🧪 Key Design Decisions
 
-- **Determinism**: all randomness via `createSeededRandom(seed)` (FNV-1a hash + LCG) — same seed = identical world every time
-- **Layered pipeline**: 5 stages (Mesh → Topography → Hydrology → Population → Geopolitics), each feeding into the next; intermediate states accessible via `TGenerationStages`
-- **Cost-based expansion**: Nations, provinces, and ethnic regions use `runMultiSourceExpansion` (Dijkstra-like frontier with terrain/biome/barrier costs) — enables natural-looking boundaries
-- **Spatial index**: `delaunay.find(x, y)` for O(log n) hover/click detection
-- **Caching**: LRU cache (`CacheManager`) avoids regenerating identical configs; mesh-level fast path skips mesh rebuild when seed+dimensions unchanged
-- **3-tier classification pipeline**: Noise → `TTerrain` (15 intermediate types) → `TLandform` (10 final types) → `TBiome` (16 ecological zones)
+- **Determinism**: all randomness via `createSeededRandom(seed)` (FNV-1a hash + LCG) — same seed = identical world every time; never use `Math.random()` in generation code
+- **Layered pipeline**: 5 stages (Mesh → Topography → Hydrology → Population → Geopolitics), each consuming the previous stage's `TDelaunayMesh`
+- **Cost-based expansion**: nations, provinces, and ethnic regions all use `runMultiSourceExpansion()` (Dijkstra-like frontier with terrain/biome/noise costs) for natural-looking boundaries
+- **Score-based classification**: landforms and biomes are determined by weighted scoring across multiple candidates, not hard elevation thresholds — this produces smooth natural transitions
+- **Spatial index**: `delaunay.find(x, y)` for O(log n) hover/click cell detection
+- **Caching**: `CacheManager` avoids re-running identical configs; mesh-level fast path skips rebuild when seed + dimensions are unchanged
+- **Unified border traversal**: `drawBordersUnified()` traverses cells once per frame for all active border types (nation, ethnic, province), avoiding triple cell scans
+- **Manual terrain overrides**: `paintTerrain()` in `MapContext` mutates cell fields directly and triggers a shallow mesh re-render — no pipeline re-run needed
 
 ---
 
 ## 📝 Notes
 
-- Generation is **client-side only**, no backend
-- Config persists to localStorage with versioned migration
-- All randomness must use `createSeededRandom()` — never `Math.random()` for generation
-- Types prefixed with `T` (e.g., `TCell`, `TNation`, `TLandform`)
-- See [AGENTS.md](./AGENTS.md) for coding conventions before contributing
-- See [documents/](./documents/) for detailed, implementation-level reimplementation specs for each geopolitics component
+- Generation is **client-side only** — no backend
+- Config persists to `localStorage` with versioned migration (Zustand persist middleware)
+- All shared types are prefixed with `T` and live in `src/types/` or `src/global.ts`
+- See [CLAUDE.md](./CLAUDE.md) for coding conventions and architecture rules
+- See [documents/](./documents/) for detailed implementation specs for each geopolitics subsystem

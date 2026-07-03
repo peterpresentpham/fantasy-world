@@ -2,7 +2,7 @@
 
 ## Main File
 
-`src/services/geopolitics/provinces.ts`
+`src/services/geopolitics/provinces/` (directory — `index.ts`, `seed-split.ts`, `post-process.ts`, `helpers.ts`)
 
 ## Key Exports
 

@@ -24,6 +24,7 @@ import ExportTab from './ExportTab';
 import GenerateTab from './GenerateTab';
 import NationsPanel from './NationsPanel';
 import PalettePanel from './PalettePanel';
+import TerrainEditorPanel from './TerrainEditorPanel';
 
 const T_MAP_CONFIG_ACTIVE_PANEL_KEY = 'map-config-active-panel';
 const T_ALLOWED_PANELS = new Set([
@@ -33,6 +34,7 @@ const T_ALLOWED_PANELS = new Set([
   'nations',
   'ethnic',
   'export',
+  'terrain',
 ]);
 
 export default function MapConfigDialog() {
@@ -78,6 +80,7 @@ export default function MapConfigDialog() {
               <SelectItem value="display">Display</SelectItem>
               <SelectItem value="nations">Nations</SelectItem>
               <SelectItem value="ethnic">Ethnic</SelectItem>
+              <SelectItem value="terrain">Edit Terrain</SelectItem>
               <SelectItem value="export">Export</SelectItem>
               <SelectItem value="palette">Palette</SelectItem>
             </SelectContent>
@@ -94,6 +97,7 @@ export default function MapConfigDialog() {
             {activePanel === 'display' && <DisplayModePanel />}
             {activePanel === 'nations' && <NationsPanel />}
             {activePanel === 'ethnic' && <EthnicPanel />}
+            {activePanel === 'terrain' && <TerrainEditorPanel />}
             {activePanel === 'export' && <ExportTab />}
             {activePanel === 'palette' && <PalettePanel />}
           </div>

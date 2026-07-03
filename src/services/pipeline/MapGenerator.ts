@@ -1,9 +1,10 @@
-import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/global';
+import { TDelaunayMesh, TGenerationConfig, TGenerationStages, TTerrainOverride } from 'src/global';
 import { buildGeopolitics } from 'src/services/geopolitics';
 import { buildPopulation } from 'src/services/geopolitics/population';
 import { buildHydrology } from 'src/services/hydrology';
 import { buildTopography } from 'src/services/terrain/buildTopography';
 import { buildMesh } from 'src/services/terrain/mesh';
+import { inferBiomeForLandform } from 'src/services/terrain/terrainPainter';
 import { CacheManager } from './CacheManager';
 
 let globalCache: CacheManager | null = null;
@@ -15,14 +16,46 @@ function getCache(): CacheManager {
   return globalCache;
 }
 
-// ─── Fast path for common cheap stages ─────────────────────────────────────────
-// Keeps a reference to the last-generated mesh to avoid full mesh regen
-// when only display settings change (same config reuses everything).
 let lastMeshResult: { key: string; mesh: TDelaunayMesh } | null = null;
+
+// Inject elevation overrides into topography cells so hydrology (rivers, climate)
+// computes correctly based on painted terrain.
+function injectElevationOverrides(
+  mesh: TDelaunayMesh,
+  overrides: Record<number, TTerrainOverride>
+): TDelaunayMesh {
+  const cells = mesh.cells.map((cell, i) => {
+    const ov = overrides[i];
+    if (!ov) return cell;
+    return { ...cell, elevation: ov.elevation, isWater: ov.isWater };
+  });
+  return { ...mesh, cells };
+}
+
+// Re-apply landform and biome overrides after hydrology re-classifies them.
+// Also re-applies elevation so erosion doesn't alter painted mountains/coasts.
+function applyLandformOverrides(
+  mesh: TDelaunayMesh,
+  overrides: Record<number, TTerrainOverride>
+): TDelaunayMesh {
+  const cells = [...mesh.cells];
+  for (const [cellIdStr, ov] of Object.entries(overrides)) {
+    const id = Number(cellIdStr);
+    const cell = cells[id];
+    if (!cell) continue;
+    cells[id] = {
+      ...cell,
+      elevation: ov.elevation,
+      isWater: ov.isWater,
+      landform: ov.landform,
+      biome: inferBiomeForLandform(ov.landform, cell.temperature, cell.precipitation, cell.biome),
+    };
+  }
+  return { ...mesh, cells };
+}
 
 export class MapGenerator {
   private readonly config: TGenerationConfig;
-  /** If true, always re-generate (bypass cache). Useful for debugging. */
   private readonly forceRefresh: boolean;
 
   constructor(config: TGenerationConfig, forceRefresh = false) {
@@ -30,23 +63,16 @@ export class MapGenerator {
     this.forceRefresh = forceRefresh;
   }
 
-  /**
-   * Generate all stages of the map.
-   *
-   * With caching enabled:
-   * - Identical config → instant return from cache
-   * - Same config (new instance) → instant return from cache
-   */
-  generate(): TGenerationStages {
+  generate(terrainOverrides: Record<number, TTerrainOverride> = {}): TGenerationStages {
+    const hasOverrides = Object.keys(terrainOverrides).length > 0;
     const cache = getCache();
 
-    // 1. Check full-result cache
-    if (!this.forceRefresh) {
+    // Full-result cache only when there are no terrain overrides
+    if (!this.forceRefresh && !hasOverrides) {
       const cached = cache.get(this.config);
       if (cached) return cached;
     }
 
-    // 2. Generate pipeline
     const {
       width,
       height,
@@ -60,7 +86,6 @@ export class MapGenerator {
 
     const configKey = [seed, width, height, cellCount].join('|');
 
-    // Mesh stage — can skip if mesh key matches (seed+dimensions same ⇒ mesh same)
     let mesh: TDelaunayMesh;
     if (!this.forceRefresh && lastMeshResult !== null && lastMeshResult.key === configKey) {
       mesh = lastMeshResult.mesh;
@@ -70,10 +95,21 @@ export class MapGenerator {
       lastMeshResult = { key: configKey, mesh: newMesh };
     }
 
-    // 3. Run stages sequentially
     const topography = buildTopography({ mesh, seed, seaLevel, topography: topographyPreset });
-    const hydrology = buildHydrology({ mesh: topography, seaLevel, seed, climateControl });
-    const population = buildPopulation({ mesh: hydrology, seed });
+
+    // Phase 1: inject painted elevations so river/climate generation uses them
+    const topoForHydrology = hasOverrides
+      ? injectElevationOverrides(topography, terrainOverrides)
+      : topography;
+
+    const hydrology = buildHydrology({ mesh: topoForHydrology, seaLevel, seed, climateControl });
+
+    // Phase 2: re-apply landform labels after hydrology re-classifies them
+    const hydrologyForPop = hasOverrides
+      ? applyLandformOverrides(hydrology, terrainOverrides)
+      : hydrology;
+
+    const population = buildPopulation({ mesh: hydrologyForPop, seed });
     const geopolitics = buildGeopolitics({ mesh: population, seed, nationCount });
 
     const result: TGenerationStages = {
@@ -84,15 +120,13 @@ export class MapGenerator {
       geopolitics,
     };
 
-    // 4. Store in cache
-    cache.set(this.config, result);
+    if (!hasOverrides) {
+      cache.set(this.config, result);
+    }
 
     return result;
   }
 
-  /**
-   * Get the generation config.
-   */
   getConfig(): TGenerationConfig {
     return this.config;
   }

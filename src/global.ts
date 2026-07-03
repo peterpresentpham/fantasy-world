@@ -92,6 +92,12 @@ export type TBiome =
   | 'freshwater'
   | 'marine';
 
+export type TTerrainOverride = {
+  elevation: number;
+  landform: TLandform;
+  isWater: boolean;
+};
+
 export type TBorderType = 'nation' | 'province';
 export type TBorderConfig = {
   landformCost: TNumRecordLandform;

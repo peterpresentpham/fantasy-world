@@ -9,6 +9,7 @@ import useThreeMap from 'src/hooks/useThreeMap';
 import { getCanvasPoint } from 'src/services/rendering/canvas/primitives';
 import { useLogisticsGameStore } from 'src/store/logisticsGameStore';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
+import { useTerrainEditorStore } from 'src/store/terrainEditorStore';
 
 export default function MapCanvasPanel() {
   const baseCanvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -26,7 +27,8 @@ export default function MapCanvasPanel() {
     handleMapCellClick,
     recalculateRoute,
   } = useLogisticsGameStore();
-  const { mesh, isGenerating, handlePointerMove } = useMapContext();
+  const { editMode, selectedLandform } = useTerrainEditorStore();
+  const { mesh, isGenerating, handlePointerMove, paintTerrain } = useMapContext();
   const { cells, width, height } = mesh;
   const show2D = !isThree;
 
@@ -49,8 +51,15 @@ export default function MapCanvasPanel() {
     (event: MouseEvent<HTMLCanvasElement>) => {
       const point = resolveCanvasPoint(event);
       const clickedId = mesh.delaunay.find(point.x, point.y);
-      if (clickedId < 0 || cells[clickedId]?.isWater) return;
+      if (clickedId < 0) return;
 
+      // Terrain edit mode takes priority
+      if (editMode && selectedLandform !== null) {
+        paintTerrain(clickedId, selectedLandform);
+        return;
+      }
+
+      if (cells[clickedId]?.isWater) return;
       const clickedCell = cells[clickedId];
       if (!clickedCell) return;
 
@@ -73,6 +82,9 @@ export default function MapCanvasPanel() {
       resolveCanvasPoint,
       mesh,
       cells,
+      editMode,
+      selectedLandform,
+      paintTerrain,
       logisticsEnabled,
       handleMapCellClick,
       recalculateRoute,
@@ -104,10 +116,15 @@ export default function MapCanvasPanel() {
               ref={overlayCanvasRef}
               width={width}
               height={height}
-              className="absolute inset-0 h-full w-full cursor-pointer"
+              className={`absolute inset-0 h-full w-full ${editMode && selectedLandform ? 'cursor-crosshair' : 'cursor-pointer'}`}
               onPointerMove={(event) => {
                 const point = resolveCanvasPoint(event);
                 handlePointerMove(point.x, point.y);
+                // Drag-to-paint: primary button held
+                if (editMode && selectedLandform !== null && event.buttons === 1) {
+                  const cellId = mesh.delaunay.find(point.x, point.y);
+                  if (cellId >= 0) paintTerrain(cellId, selectedLandform);
+                }
               }}
               onPointerLeave={() => {
                 setHoverIndex(null);

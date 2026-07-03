@@ -13,7 +13,7 @@
 - `T_MIN_ETHNIC_POPULATION = 1000`
 - `GEOPOLITICAL_CONFIG.ethnic` fields:
   - `majorGroupMin`
-  - `majorGroupCountMax`
+  - `majorGroupMax`
   - `dominantShareMin`, `dominantShareMax`
   - `secondaryShareMin`, `secondaryShareMax`
   - `crossBorderBlend`
@@ -41,7 +41,7 @@ In `buildEthnicRegions(...)`:
    - `smoothCrossBorderEthnics(...)` (second time)
    - `spreadEthnicsAcrossNations(...)`
    - `smoothEthnicRegions(...)`
-   - `fillUnclaimedLand(...)`
+   - `fillUnclaimedEthnicLand(...)`
    - `enforceEthnicMinPop(...)`
 
 Pass order is part of behavior.
@@ -53,7 +53,7 @@ Pass order is part of behavior.
 `getEthnicGroupCount(landCellCount, nationCount, config)`:
 
 - `byLand = floor(landCellCount / 1300)`
-- return `clamp(max(nationCount, byLand), majorGroupMin, majorGroupCountMax)`
+- return `clamp(max(nationCount, byLand), majorGroupMin, majorGroupMax)`
 
 ### Seed Picking
 
@@ -161,7 +161,7 @@ Detailed parameters:
 
 ### Unclaimed and Minimum Population
 
-`fillUnclaimedLand(...)`:
+`fillUnclaimedEthnicLand(...)`:
 
 - For each land cell with invalid ethnic owner:
   - assign nearest claimed land ethnic
@@ -171,7 +171,7 @@ Detailed parameters:
 - Iterate up to `maxIterations = 12`.
 - Find under-threshold ethnic groups (population < `T_MIN_ETHNIC_POPULATION` = 1000).
 - Merge/reassign toward strongest border-vote targets, or nearest ethnic if no border votes.
-- Fallback: if no groups survive, keep the largest group and reassign all land cells to it.
+- Fallback: if `finalEthnicIds.size === 0 && totalLandPopulation < T_MIN_ETHNIC_POPULATION`, keep the largest group and reassign all land cells to it.
 - Final pass: clean up cells belonging to eliminated ethnic groups.
 
 ## Determinism Requirements

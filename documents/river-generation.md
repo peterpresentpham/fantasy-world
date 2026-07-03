@@ -10,7 +10,7 @@ Primary sources:
 - `src/services/hydrology/index.ts` (orchestration — `buildHydrology()`)
 - `src/services/hydrology/lakes.ts` (lake expansion/filtering)
 - `src/configs/map/hydrology.ts` (`HYDROLOGY_CONFIG`, `RIVER_CONFIG`, `LAKE_CONFIG`)
-- `src/types/map.types.ts` (`TRiver`, `TRiverEndType`, `TRiverKind` types)
+- `src/global.ts` (`TRiver`, `TRiverEndType`, `TRiverKind` types)
 
 ## Required Constants and Sentinels
 
@@ -108,10 +108,22 @@ Initialize:
 - `effectiveFlow = Float32Array(N)`
 - `cellModifier = pow(N / 10000, cellsNumberModifierExp)`
 
+Biome-based water retention lookup (used in base flow):
+
+```
+BIOME_WATER_RETENTION: Partial<Record<TBiome, number>> = {
+  wetland: 1.5, tropical_forest: 1.3, temperate_forest: 1.1, boreal_forest: 1.0,
+  marine: 0, freshwater: 0, ice: 0.15, tundra: 0.5, grassland: 0.75,
+  steppe: 0.55, savanna: 0.45, desert_hot: 0.08, desert_cold: 0.15,
+} // default 0.8
+```
+
 Base flow:
 
 - For each land cell:
-  - `flow[i] = (8 + precipitation[i] * 12) * cellModifier`
+  - `biomeRetention = BIOME_WATER_RETENTION[cell.biome] ?? 0.8`
+  - `aridityDamp = max(0, 1 - cell.aridityIndex * 0.55)`
+  - `flow[i] = (1.5 + precipitation[i] * 16 * biomeRetention * aridityDamp) * cellModifier`
 
 Choose downstream:
 
@@ -141,7 +153,7 @@ Effective flow:
 
 - For each land cell:
   - `next = downstream[i]`
-  - `slope = next >= 0 ? max(0, filledElevation[i] - filledElevation[next]) : 0`
+  - `slope = next >= 0 ? max(0, filledElevation[i] - filledElevation[next]) : max(0, filledElevation[i])` (coast-outlet cells use cell's own elevation as slope)
   - `effectiveFlow[i] = flow[i] * (1 + slope * 2.5)`
 
 ## Stage D: `buildRiverGraph(...)`
@@ -152,8 +164,10 @@ A cell is included iff all are true:
 
 - `!cell.isWater`
 - `downstream[i] >= 0 || downstream[i] == T_COAST_OUTLET`
-- `flow[i] >= threshold`
-- `upstreamCount[i] <= 1 || flow[i] >= threshold * 1.4`
+- `flow[i] >= effectiveThreshold` where:
+  - `aridity = cell.aridityIndex ?? 0`
+  - `effectiveThreshold = threshold * (aridity > 1.5 ? 4.0 : aridity > 1.0 ? 2.5 : aridity > 0.7 ? 1.5 : 1.0)`
+- `upstreamCount[i] <= 1 || flow[i] >= effectiveThreshold * 1.4`
 
 Sort candidates by:
 
@@ -174,7 +188,7 @@ At each cursor step:
 1. `if cursor already visited`: stop.
 2. `existingRiver = riverByCell[cursor]`
 3. `if existingRiver >= 0 && existingRiver != riverId`:
-   - If `effectiveFlow[cursor] <= effectiveFlow[source]`:
+   - If `effectiveFlow[cursor] <= flow[cursor]`:
      - existing becomes tributary of current (`riverParent[existing] = riverId`)
    - else:
      - current becomes tributary of existing (`riverParent[riverId] = existing`)
@@ -188,7 +202,11 @@ At each cursor step:
    - `cells[next].isWater`
 6. Else `cursor = next`.
 
-### D3. Tail extension to nearest water
+### D3. Meander injection
+
+After chain walk, before tail extension, each chain segment longer than `RIVER_CONFIG.meander.minSegmentLength` (16 units) gets a midpoint inserted perpendicular to the segment. Amplitude = `RIVER_CONFIG.meander.base * (1 - t) * 6` where `t` goes from 0 (source) to 1 (mouth) — bends are strongest near the source and fade downstream.
+
+### D4. Tail extension to nearest water
 
 For each built chain:
 
@@ -204,9 +222,9 @@ For each built chain:
     - attenuate flow (`*0.985`) and effective flow (`*0.98`) along appended segment
     - final downstream points to found water cell
 
-### D4. Chain pruning and river object construction
+### D5. Chain pruning and river object construction
 
-- If `chain.length < minRiverCells`:
+- If `chain.length < minRiverCells` (or `< minRiverCells * 2` when `sourceCell.aridityIndex > 1.0`):
   - clear ownership for all chain cells (`riverByCell[cell] = -1`)
   - skip river object
 
@@ -228,10 +246,33 @@ Else build `TRiver`:
   - Per-cell width: `fluxWidth + lengthWidth` where lengthWidth = `linearGrow + earlyProgression(ln2) + downstreamBoost(pow(t, 1.65)*1.55)`
   - `widthFactor = 1.12` for parent rivers, `0.78` for tributaries.
   - Two smoothing passes over `pointOffsets` (0.25/0.5/0.25 averaging).
-  - Monotonic non-decreasing offset enforcement.
-  - Final riverWidth: `min(maxWidth, max(0.45, pow(offset/1.5, 1.8)))`
-- Bank geometry: `leftBank`/`rightBank` polyline with normal offset.
+  - Monotonic strictly-increasing enforcement: `if pointOffsets[i] < prev: pointOffsets[i] = prev + 0.01`.
+  - Final `riverWidthByCell[cellId] = max(existing, min(maxWidth, max(0.45, pow(offset/1.5, 1.8))))` — takes the higher width when multiple rivers share a cell.
+- Bank geometry: `leftBank`/`rightBank` are local variables used only to build `polygon` — they are **not** stored in `TRiver`.
 - Polygon: `[...leftBank, ...rightBank.reverse()]`.
+
+`TRiver` stored fields (complete list):
+
+| Field | Description |
+|---|---|
+| `id` | river id |
+| `basinId` | equals `id` (always same) |
+| `name` | from `createRiverName(...)` |
+| `kind` | `'river'` / `'fork'` / `'branch'` / `'creek'` |
+| `endType` | `'sea'` / `'lake'` / `'offscreen'` / `'inland-sink'` |
+| `parentRiverId` | id of river this flows into, or `null` |
+| `tributaryIds` | ids of rivers that join this one |
+| `sourceCellId` | first cell of the chain |
+| `mouthCellId` | last cell after tail extension |
+| `length` | cumulative Euclidean distance along polyline |
+| `mouthWidth` | width at last polyline point |
+| `peakFlow` | max `flow[cellId]` across all chain cells |
+| `cells` | raw array of chain cell IDs |
+| `polyline` | meandered centerline point array |
+| `pointOffsets` | per-point width offset array |
+| `polygon` | `[...leftBank, ...rightBank.reverse()]` |
+
+Note: `confluences: TConfluenceEvent[]` is computed internally in `buildRiverGraph` but silently discarded by `generateRivers` — it is not in the return value.
 
 ## Stage E: `validateRivers(...)` (removed)
 

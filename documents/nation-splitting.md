@@ -59,9 +59,9 @@ The nation pipeline uses:
 - Apply seed spacing and component coverage logic including:
   - Soft geography bias: large + far disconnected components get separate seeds.
   - Small/similar close islands pushed toward sharing nations.
-  - Noise via `sin(cellId * 2654435761 + seedHash) * 0.35`.
+  - Noise via `sin((cellId * 2654435761 + seedHash) * 0.000001) * 0.35`.
 - `estimateWaterCells(...)` calculates water gaps between components.
-- `minComponentSize` parameter filters candidates (default = `GEOPOLITICAL_CONFIG.minLandCells + 6`).
+- `minComponentSize` parameter filters candidates (default = `1`; the caller `buildLandNations` always passes `GEOPOLITICAL_CONFIG.minLandCells + 6`).
 
 ### Step 3: Multi-source Expansion
 
@@ -142,6 +142,7 @@ Decision pattern:
 - `fillUnclaimedLand(...)` — assigns any unclaimed land cells to best neighboring nation.
 - `ensureAllLandClaimed(...)` — if still unclaimed, assign to nearest claimed nation cell.
 - `enforceMinNationArea(...)` — ensures minimum nation sizes.
+- `ensureAllLandClaimed(...)` — second call after enforceMinNationArea to claim any cells displaced during area enforcement.
 - Runs up to 3 passes, stops early when stabilized.
 
 `diversifySmallNationSizes(...)`:
