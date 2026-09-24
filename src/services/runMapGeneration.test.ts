@@ -1,5 +1,5 @@
 import { DEFAULT_CONFIG } from 'src/configs/map/common';
-import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/global';
+import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/types/global';
 import { describe, expect, it } from 'vitest';
 import { MapGenerator } from './pipeline/MapGenerator';
 

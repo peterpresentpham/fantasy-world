@@ -1,4 +1,4 @@
-import { TClimateControl, TDisplaySettings, TTopography } from 'src/global';
+import { TClimateControl, TDisplaySettings, TTopography } from 'src/types/global';
 
 export const NATION_COLORS = [
   '#e6194b',

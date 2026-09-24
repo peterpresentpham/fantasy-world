@@ -1,5 +1,5 @@
 import { HYDROLOGY_CONFIG, RIVER_CONFIG } from 'src/configs/map/hydrology';
-import { TBiome, TCell, TPoint, TRiver, TRiverEndType, TRiverKind } from 'src/global';
+import { TBiome, TCell, TPoint, TRiver, TRiverEndType, TRiverKind } from 'src/types/global';
 import { TFifoQueue } from 'src/services/utils/collections';
 import { createSeededRandom } from 'src/services/utils/math';
 

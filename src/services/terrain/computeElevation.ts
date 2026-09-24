@@ -1,6 +1,6 @@
 import { TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
 import { clamp, createSeededRandom, hashSeed, smoothStep } from 'src/services/utils/math';
-import { TDelaunayMesh, TPoint } from 'src/global';
+import { TDelaunayMesh, TPoint } from 'src/types/global';
 import { computeIsostaticElevation } from './isostasy';
 import { TNoiseSampler, createNoiseSampler } from './noise';
 import { TPlate, classifyBoundaryForCell } from './tectonics';

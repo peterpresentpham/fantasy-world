@@ -4,7 +4,7 @@ import { TFifoQueue } from 'src/services/utils/collections';
 import { findNearestCell } from 'src/services/utils/geometry';
 import { collectConnectedComponents, runMultiSourceExpansion } from 'src/services/utils/graph';
 import { createSeededRandom, hashSeed } from 'src/services/utils/math';
-import { TCell, TEthnic } from 'src/global';
+import { TCell, TEthnic } from 'src/types/global';
 import Cost from './cost';
 import { createRegionalName, edgeNoise, getOwnerLandCellIds, isLand } from './shared';
 

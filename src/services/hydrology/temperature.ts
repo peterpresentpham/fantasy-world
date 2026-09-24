@@ -1,6 +1,6 @@
 import { TEMPERATURE_CONFIG } from 'src/configs/map/hydrology';
 import { clamp, dot, hashSeed } from 'src/services/utils/math';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 import { TWindVector } from './wind';
 
 type TComputeTemperatureParams = {

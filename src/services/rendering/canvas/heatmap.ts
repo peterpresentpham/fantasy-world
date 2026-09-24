@@ -1,5 +1,5 @@
 import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 import { TRgbColor, clamp01, hexToRgb, interpolateColor, toRgbString } from './shared';
 
 export function getPopulationColor(

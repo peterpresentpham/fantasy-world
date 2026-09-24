@@ -1,5 +1,5 @@
 import { MAX_PROVINCE_POP, MIN_POP_PERCENT, PROVINCE_TUNING } from 'src/configs/map/geopolitics';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 import { sortDescStable } from 'src/services/utils';
 import { runMultiSourceExpansion } from 'src/services/utils/graph';
 import { hashSeed } from 'src/services/utils/math';

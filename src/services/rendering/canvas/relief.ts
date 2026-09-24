@@ -1,4 +1,5 @@
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
+import { clamp } from 'src/services/utils/math';
 import { drawPolygon } from './shared';
 
 type TShadedReliefOptions = {
@@ -14,10 +15,6 @@ function normalize3(x: number, y: number, z: number) {
   const length = Math.hypot(x, y, z);
   if (length <= 0.000001) return [0, 0, 1] as const;
   return [x / length, y / length, z / length] as const;
-}
-
-function clamp(value: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, value));
 }
 
 function getCellSlopeVector(cell: TCell, cells: TCell[]) {

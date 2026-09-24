@@ -20,7 +20,8 @@ type TProps = {
 };
 
 export default function useMapOverlay({ canvasRef }: TProps) {
-  const { hoverIndex, displaySettings } = useMapExplorerStore();
+  const hoverIndex = useMapExplorerStore((s) => s.hoverIndex);
+  const displaySettings = useMapExplorerStore((s) => s.displaySettings);
   const { mesh } = useMapContext();
   const { cells } = mesh;
   const isIso = displaySettings.isometric;

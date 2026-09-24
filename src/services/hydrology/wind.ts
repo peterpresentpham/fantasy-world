@@ -1,6 +1,6 @@
 import { PRECIPITATION_CONFIG } from 'src/configs/map/hydrology';
 import { hashSeed } from 'src/services/utils/math';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 
 const WIND_MODEL = PRECIPITATION_CONFIG.wind;
 

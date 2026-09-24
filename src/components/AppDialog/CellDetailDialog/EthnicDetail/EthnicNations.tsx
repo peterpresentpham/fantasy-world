@@ -5,8 +5,8 @@ import { useMemo, useState } from 'react';
 import BlurCard from 'src/components/BlurCard';
 import PieChart from 'src/components/charts/PieChart';
 import { Button } from 'src/components/ui/button';
-import { TPieChartData } from 'src/global';
 import { formatPopulation, getNationColor } from 'src/services/utils';
+import { TPieChartData } from 'src/types/global';
 
 type TNationPopulation = {
   id: number;

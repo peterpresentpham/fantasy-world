@@ -2,9 +2,9 @@
 
 import BlurCard from 'src/components/BlurCard';
 import TerrainStatistic from 'src/components/TerrainStatistic';
-import { TDelaunayMesh } from 'src/global';
 import { TEthnicData } from 'src/hooks/useEthnicStatistic';
 import { formatPopulation } from 'src/services/utils';
+import { TDelaunayMesh } from 'src/types/global';
 import EthnicMiniMap from './EthnicMiniMap';
 import EthnicNations from './EthnicNations';
 

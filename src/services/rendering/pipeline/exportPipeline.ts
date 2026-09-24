@@ -1,7 +1,7 @@
 import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { getRiverSegmentEndPoint } from 'src/services/rendering/canvas/primitives';
 import { getNationColor, getRiverStrokeWidth } from 'src/services/utils';
-import { TDelaunayMesh, TDisplaySettings, TPoint } from 'src/global';
+import { TDelaunayMesh, TDisplaySettings, TPoint } from 'src/types/global';
 
 function toPolygonPath(points: TPoint[]) {
   if (points.length === 0) return '';

@@ -1,5 +1,5 @@
 import { EROSION_CONFIG, HYDROLOGY_CONFIG, LAKE_CONFIG } from 'src/configs/map/hydrology';
-import { TCell, TDelaunayMesh, THydrologyParams, TTerrain } from 'src/global';
+import { TCell, TDelaunayMesh, THydrologyParams, TTerrain } from 'src/types/global';
 import {
   buildWaterInfluence,
   classifyTerrain,

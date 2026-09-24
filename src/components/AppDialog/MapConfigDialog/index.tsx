@@ -10,13 +10,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from 'src/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from 'src/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from 'src/components/ui/tabs';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
 import DisplayModePanel from './DisplayModePanel';
 import EthnicPanel from './EthnicPanel';
@@ -61,6 +55,7 @@ export default function MapConfigDialog() {
           className="fantasy-glass-strong pointer-events-auto h-10 px-3 shadow-lg"
         >
           <Settings2 className="size-4" />
+          <span className="sr-only">Map configuration</span>
         </Button>
       </DialogTrigger>
       <DialogContent
@@ -71,20 +66,34 @@ export default function MapConfigDialog() {
           <DialogTitle>Map Configuration</DialogTitle>
         </DialogHeader>
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-          <Select value={activePanel} onValueChange={setActivePanel}>
-            <SelectTrigger className="fantasy-glass mt-1 w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent className="fantasy-glass-strong">
-              <SelectItem value="generation">Generation</SelectItem>
-              <SelectItem value="display">Display</SelectItem>
-              <SelectItem value="nations">Nations</SelectItem>
-              <SelectItem value="ethnic">Ethnic</SelectItem>
-              <SelectItem value="terrain">Edit Terrain</SelectItem>
-              <SelectItem value="export">Export</SelectItem>
-              <SelectItem value="palette">Palette</SelectItem>
-            </SelectContent>
-          </Select>
+          <Tabs value={activePanel} onValueChange={setActivePanel} className="mt-1 gap-0">
+            <TabsList
+              variant="line"
+              className="fantasy-glass w-full flex-wrap justify-start gap-1 rounded-lg p-1.5 group-data-horizontal/tabs:h-auto"
+            >
+              <TabsTrigger className="flex-none" value="generation">
+                Generation
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="display">
+                Display
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="nations">
+                Nations
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="ethnic">
+                Ethnic
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="terrain">
+                Edit Terrain
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="export">
+                Export
+              </TabsTrigger>
+              <TabsTrigger className="flex-none" value="palette">
+                Palette
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
           <Button
             type="button"
             onClick={resetToDefaults}

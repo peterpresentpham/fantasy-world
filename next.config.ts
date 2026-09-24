@@ -1,5 +1,6 @@
-/** @type {import('next').NextConfig} */
-const nextConfig = {
+import type { NextConfig } from 'next';
+
+const nextConfig: NextConfig = {
   // Automatically Copying Traced Files
   output: 'standalone',
   reactStrictMode: true,

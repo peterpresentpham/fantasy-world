@@ -1,7 +1,7 @@
 import { HYDROLOGY_CONFIG } from 'src/configs/map/hydrology';
 import { LANDFORM_ELEVATION_BANDS, TERRAIN_CLASSIFICATION_RULES } from 'src/configs/map/terrain';
 import { classifyTerrainWater } from 'src/services/utils/cell';
-import { TBiome, TCell, TLandform, TTerrain } from 'src/global';
+import { TBiome, TCell, TLandform, TTerrain } from 'src/types/global';
 import { clamp } from 'src/services/utils/math';
 
 export function buildWaterInfluence(cells: TCell[]): Float32Array {
@@ -145,6 +145,10 @@ export function classifyTerrain(
   return 'plains';
 }
 
+// General terrain suitability — separately tuned from
+// geopolitics/population.ts's climateSuitability (population-density climate
+// fitness, different ideal points/weights). See that file for why they stay
+// distinct rather than merged.
 function climateSuitability(precipitation: number, temperature: number) {
   const climateScore = 1 - Math.abs(temperature - 0.52) * 1.15;
   const moistureScore = 1 - Math.abs(precipitation - 0.52) * 0.95;

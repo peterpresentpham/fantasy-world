@@ -1,124 +1,26 @@
 'use client';
 
-import { RefObject, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { useMapContext } from 'src/contexts/map.context';
-import { TCell, TLandform } from 'src/global';
+import { buildTerrainGeometry } from 'src/services/rendering/threeTerrain';
 
-type TProps = {
-  containerRef: RefObject<HTMLDivElement | null>;
-};
-
-function getElevationHeight(elevation: number, landform: TLandform | null): number {
-  const base = elevation * 16;
-  if (landform === 'mountain' || landform === 'volcanic_field') return base * 2.2;
-  if (landform === 'hills') return base * 1.4;
-  if (landform === 'plateau') return base * 1.3;
-  if (landform === 'valley') return base * 0.9;
-  return base;
-}
-
-function elevationTint(elevation: number, baseColor: THREE.Color): THREE.Color {
-  const result = baseColor.clone();
-  if (elevation > 0.7) {
-    const t = (elevation - 0.7) / 0.3;
-    result.lerp(new THREE.Color(0xd0dce8), t * 0.25);
-  } else if (elevation < 0.15) {
-    const t = 1 - elevation / 0.15;
-    result.lerp(new THREE.Color(0x000000), t * 0.1);
-  }
-  return result;
-}
-
-function buildCellGeometry(
-  cell: TCell,
-  landform: TLandform | null,
-  cells: TCell[],
-  vertexElevationCache: Map<string, number>
-): { geometry: THREE.BufferGeometry; color: THREE.Color } {
-  const poly = cell.polygon;
-  const n = poly.length;
-  if (n < 3) return { geometry: new THREE.BufferGeometry(), color: new THREE.Color(0x3f3f46) };
-
-  const baseColor = landform
-    ? new THREE.Color(LANDFORM_CONFIG[landform].color)
-    : new THREE.Color(0x3f3f46);
-  const topColor = elevationTint(cell.elevation, baseColor);
-
-  const vertexKey = (px: number, py: number) => `${px.toFixed(2)},${py.toFixed(2)}`;
-
-  const vertexElevations: number[] = [];
-  for (let i = 0; i < n; i++) {
-    const key = vertexKey(poly[i][0], poly[i][1]);
-    let avgElev = vertexElevationCache.get(key);
-    if (avgElev === undefined) {
-      let sum = 0;
-      let count = 0;
-      for (const c of cells) {
-        for (const v of c.polygon) {
-          if (Math.hypot(v[0] - poly[i][0], v[1] - poly[i][1]) < 0.5) {
-            sum += getElevationHeight(c.elevation, c.isWater ? ('coast' as TLandform) : c.landform);
-            count++;
-            break;
-          }
-        }
-      }
-      avgElev = count > 0 ? sum / count : getElevationHeight(cell.elevation, landform);
-      vertexElevationCache.set(key, avgElev);
-    }
-    vertexElevations.push(avgElev);
-  }
-
-  const vertices: number[] = [];
-  const colors: number[] = [];
-  const indices: number[] = [];
-
-  for (let i = 0; i < n; i++) {
-    vertices.push(poly[i][0], -poly[i][1], vertexElevations[i]);
-    colors.push(topColor.r, topColor.g, topColor.b);
-  }
-  const darkerBot = baseColor.clone().lerp(new THREE.Color(0x000000), 0.35);
-  for (let i = 0; i < n; i++) {
-    vertices.push(poly[i][0], -poly[i][1], 0);
-    colors.push(darkerBot.r, darkerBot.g, darkerBot.b);
-  }
-
-  const topStart = 0;
-  const bottomStart = n;
-
-  for (let i = 1; i < n - 1; i++) {
-    indices.push(topStart, topStart + i, topStart + i + 1);
-  }
-  for (let i = 1; i < n - 1; i++) {
-    indices.push(bottomStart, bottomStart + i + 1, bottomStart + i);
-  }
-  for (let i = 0; i < n; i++) {
-    const next = (i + 1) % n;
-    const a = topStart + i;
-    const b = topStart + next;
-    const c = bottomStart + next;
-    const d = bottomStart + i;
-    indices.push(a, b, c, a, c, d);
-  }
-
-  const geometry = new THREE.BufferGeometry();
-  geometry.setAttribute('position', new THREE.Float32BufferAttribute(vertices, 3));
-  geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
-  geometry.setIndex(indices);
-  geometry.computeVertexNormals();
-
-  return { geometry, color: topColor };
-}
-
-export default function useThreeMap({ containerRef }: TProps) {
+/**
+ * Returns a callback ref to attach to the 3D container element. A plain
+ * RefObject's `.current` mutating from null to a DOM node doesn't trigger
+ * effect deps, so toggling 3D mode on (which mounts the container for the
+ * first time) would never re-run this hook's setup — a callback ref stores
+ * the node in state instead, which does.
+ */
+export default function useThreeMap() {
   const { mesh } = useMapContext();
   const cleanupRef = useRef<(() => void) | null>(null);
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    const container = containerRef.current;
     if (!container) return;
+    const containerEl = container;
 
     cleanupRef.current?.();
 
@@ -131,7 +33,7 @@ export default function useThreeMap({ containerRef }: TProps) {
 
     scene.fog = new THREE.Fog('#09131f', maxDim * 0.4, maxDim * 1.8);
 
-    const aspect = container.clientWidth / container.clientHeight;
+    const aspect = containerEl.clientWidth / containerEl.clientHeight;
     const camera = new THREE.PerspectiveCamera(30, aspect, 1, 20000);
     camera.position.set(centerX, -centerY + maxDim * 0.12, maxDim * 0.45);
     camera.lookAt(centerX, -centerY, 0);
@@ -140,13 +42,13 @@ export default function useThreeMap({ containerRef }: TProps) {
       antialias: true,
       powerPreference: 'high-performance',
     });
-    renderer.setSize(container.clientWidth, container.clientHeight);
+    renderer.setSize(containerEl.clientWidth, containerEl.clientHeight);
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.2;
-    container.appendChild(renderer.domElement);
+    containerEl.appendChild(renderer.domElement);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
@@ -181,9 +83,6 @@ export default function useThreeMap({ containerRef }: TProps) {
     const hemi = new THREE.HemisphereLight(0x87ceeb, 0x362907, 0.6);
     scene.add(hemi);
 
-    const cellGroup = new THREE.Group();
-    const geometries: THREE.BufferGeometry[] = [];
-    const vertexElevationCache = new Map<string, number>();
     const sharedMaterial = new THREE.MeshStandardMaterial({
       roughness: 0.75,
       metalness: 0.02,
@@ -192,25 +91,15 @@ export default function useThreeMap({ containerRef }: TProps) {
       side: THREE.DoubleSide,
     });
 
-    for (const cell of mesh.cells) {
-      const landform = cell.isWater ? ('coast' as TLandform) : cell.landform;
-      const { geometry: geom } = buildCellGeometry(
-        cell,
-        landform,
-        mesh.cells,
-        vertexElevationCache
-      );
-      if (geom.attributes.position.count === 0) continue;
-      geometries.push(geom);
-
-      const mesh3D = new THREE.Mesh(geom, sharedMaterial);
-      mesh3D.castShadow = true;
-      mesh3D.receiveShadow = true;
-      mesh3D.userData.cellId = cell.id;
-      cellGroup.add(mesh3D);
+    // Single merged, vertex-smoothed geometry for the whole mesh — one draw
+    // call, since every cell shares sharedMaterial.
+    const mergedGeometry = buildTerrainGeometry(mesh.cells);
+    if (mergedGeometry) {
+      const terrainMesh = new THREE.Mesh(mergedGeometry, sharedMaterial);
+      terrainMesh.castShadow = true;
+      terrainMesh.receiveShadow = true;
+      scene.add(terrainMesh);
     }
-
-    scene.add(cellGroup);
 
     let animId: number;
     let needsRender = true;
@@ -229,9 +118,8 @@ export default function useThreeMap({ containerRef }: TProps) {
     animate();
 
     function onResize() {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
+      const w = containerEl.clientWidth;
+      const h = containerEl.clientHeight;
       if (w === 0 || h === 0) return;
       camera.aspect = w / h;
       camera.updateProjectionMatrix();
@@ -243,12 +131,17 @@ export default function useThreeMap({ containerRef }: TProps) {
       window.removeEventListener('resize', onResize);
       cancelAnimationFrame(animId);
       renderer.dispose();
-      for (const g of geometries) g.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      mergedGeometry?.dispose();
+      sharedMaterial.dispose();
+      if (containerEl.contains(renderer.domElement)) {
+        containerEl.removeChild(renderer.domElement);
       }
     };
 
     return cleanupRef.current;
-  }, [containerRef, mesh]);
+  }, [container, mesh]);
+
+  return useCallback((node: HTMLDivElement | null) => {
+    setContainer(node);
+  }, []);
 }

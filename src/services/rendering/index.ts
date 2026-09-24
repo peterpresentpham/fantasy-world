@@ -1,4 +1,4 @@
-import { TCell, TCellStats, TDisplaySettings, TEthnic, TNation, TPoint } from 'src/global';
+import { TCell, TCellStats, TDisplaySettings, TEthnic, TNation, TPoint } from 'src/types/global';
 import {
   createLayerPlan,
   renderBackground,

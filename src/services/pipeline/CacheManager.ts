@@ -1,4 +1,4 @@
-import { TGenerationConfig, TGenerationStages } from 'src/global';
+import { TDelaunayMesh, TGenerationConfig, TGenerationStages } from 'src/types/global';
 
 // ─── Config ────────────────────────────────────────────────────────────────────
 
@@ -7,17 +7,18 @@ interface TCacheOptions {
   maxResults: number;
   /** Whether to enable stage-level caching (mesh → cache → reuse for same config) */
   enableStageCaching: boolean;
-  /** Whether to enable fingerprint-based dedup (identical seeds skip regeneration) */
-  enableDedup: boolean;
 }
 
 const DEFAULT_CACHE_OPTIONS: TCacheOptions = {
   maxResults: 5,
   enableStageCaching: true,
-  enableDedup: true,
 };
 
-// ─── Cache Key ─────────────────────────────────────────────────────────────────
+// ─── Cache Keys ────────────────────────────────────────────────────────────────
+// Each key below is a prefix of the next, matching the pipeline's actual data
+// dependencies (mesh -> topography -> hydrology+population -> geopolitics),
+// so a config change only invalidates the stages that actually depend on it —
+// e.g. changing nationCount alone only recomputes geopolitics.
 
 /**
  * Deterministic fingerprint of a TGenerationConfig.
@@ -41,32 +42,111 @@ function hashConfig(config: TGenerationConfig): string {
   return parts.join('|');
 }
 
-// ─── LRU Cache Entry ───────────────────────────────────────────────────────────
+/** Everything buildTopography's result depends on. */
+function hashTopographyStage(config: TGenerationConfig): string {
+  return [
+    config.seed,
+    String(config.width),
+    String(config.height),
+    String(config.cellCount),
+    String(config.seaLevel),
+    config.topography,
+  ].join('|');
+}
 
-interface TCacheEntry {
-  key: string;
-  result: TGenerationStages;
-  /** Timestamp of last access (for LRU eviction) */
-  lastAccess: number;
+/** Everything buildHydrology + buildPopulation's results depend on. */
+function hashPostPopulationStage(config: TGenerationConfig): string {
+  const climate = config.climateControl;
+  return [
+    hashTopographyStage(config),
+    String(climate.temperatureOffset.toFixed(6)),
+    String(climate.temperatureContrast.toFixed(6)),
+    String(climate.precipitationScale.toFixed(6)),
+    String(climate.precipitationOffset.toFixed(6)),
+    String(climate.humanImpact.toFixed(6)),
+  ].join('|');
+}
+
+// ─── Generic LRU Map ───────────────────────────────────────────────────────────
+
+class LruMap<TValue> {
+  private readonly entries = new Map<string, { value: TValue; lastAccess: number }>();
+
+  constructor(private readonly maxSize: number) {}
+
+  get(key: string): TValue | null {
+    const entry = this.entries.get(key);
+    if (!entry) return null;
+    entry.lastAccess = Date.now();
+    return entry.value;
+  }
+
+  set(key: string, value: TValue): void {
+    const existing = this.entries.get(key);
+    if (existing) {
+      existing.value = value;
+      existing.lastAccess = Date.now();
+      return;
+    }
+
+    if (this.entries.size >= this.maxSize) {
+      let oldestKey: string | null = null;
+      let oldestTimestamp = Infinity;
+      for (const [entryKey, entry] of this.entries) {
+        if (entry.lastAccess < oldestTimestamp) {
+          oldestTimestamp = entry.lastAccess;
+          oldestKey = entryKey;
+        }
+      }
+      if (oldestKey) this.entries.delete(oldestKey);
+    }
+
+    this.entries.set(key, { value, lastAccess: Date.now() });
+  }
+
+  has(key: string): boolean {
+    return this.entries.has(key);
+  }
+
+  clear(): void {
+    this.entries.clear();
+  }
+
+  get size(): number {
+    return this.entries.size;
+  }
+
+  keys(): string[] {
+    return Array.from(this.entries.keys());
+  }
 }
 
 // ─── CacheManager ──────────────────────────────────────────────────────────────
 
+type TTopographyCacheEntry = { topography: TDelaunayMesh };
+type TPostPopulationCacheEntry = { hydrology: TDelaunayMesh; population: TDelaunayMesh };
+
 /**
- * Manages generation result cache with LRU eviction.
+ * Manages generation result cache with LRU eviction, at three granularities:
  *
- * Use cases:
- * - User tweaks display settings → same config → instant reuse
- * - User switches seeds back and forth → cached results
- * - Same stage across different configs → stage-level cache
+ * - Full result (get/set) — the whole config is unchanged (display-only tweaks).
+ * - Topography stage — seed/dimensions/cellCount/seaLevel/topography preset
+ *   unchanged, so mesh + topography can be reused.
+ * - Post-population stage — the above plus climateControl unchanged, so
+ *   hydrology + population can be reused (only geopolitics, which is the
+ *   only stage depending on nationCount, needs recomputing).
  */
 export class CacheManager {
-  private readonly cache: Map<string, TCacheEntry>;
+  private readonly cache: LruMap<TGenerationStages>;
+  private readonly topographyCache: LruMap<TTopographyCacheEntry>;
+  private readonly postPopulationCache: LruMap<TPostPopulationCacheEntry>;
   private readonly options: TCacheOptions;
 
   constructor(options?: Partial<TCacheOptions>) {
-    this.cache = new Map();
     this.options = { ...DEFAULT_CACHE_OPTIONS, ...options };
+    this.cache = new LruMap(this.options.maxResults);
+    this.topographyCache = new LruMap(this.options.maxResults);
+    this.postPopulationCache = new LruMap(this.options.maxResults);
   }
 
   /**
@@ -75,15 +155,7 @@ export class CacheManager {
    */
   get(config: TGenerationConfig): TGenerationStages | null {
     if (!this.options.enableStageCaching) return null;
-
-    const key = hashConfig(config);
-    const entry = this.cache.get(key);
-
-    if (!entry) return null;
-
-    // touch LRU
-    entry.lastAccess = Date.now();
-    return entry.result;
+    return this.cache.get(hashConfig(config));
   }
 
   /**
@@ -92,39 +164,7 @@ export class CacheManager {
    */
   set(config: TGenerationConfig, result: TGenerationStages): void {
     if (!this.options.enableStageCaching) return;
-
-    const key = hashConfig(config);
-
-    // Already cached — just update
-    if (this.cache.has(key)) {
-      const entry = this.cache.get(key)!;
-      entry.result = result;
-      entry.lastAccess = Date.now();
-      return;
-    }
-
-    // Evict LRU if full
-    if (this.cache.size >= this.options.maxResults) {
-      let oldestKey: string | null = null;
-      let oldestTimestamp = Infinity;
-
-      for (const [entryKey, entry] of this.cache) {
-        if (entry.lastAccess < oldestTimestamp) {
-          oldestTimestamp = entry.lastAccess;
-          oldestKey = entryKey;
-        }
-      }
-
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
-      }
-    }
-
-    this.cache.set(key, {
-      key,
-      result,
-      lastAccess: Date.now(),
-    });
+    this.cache.set(hashConfig(config), result);
   }
 
   /**
@@ -135,15 +175,37 @@ export class CacheManager {
     return this.cache.has(hashConfig(config));
   }
 
-  /**
-   * Clear all cached results.
-   */
-  clear(): void {
-    this.cache.clear();
+  getTopography(config: TGenerationConfig): TTopographyCacheEntry | null {
+    if (!this.options.enableStageCaching) return null;
+    return this.topographyCache.get(hashTopographyStage(config));
+  }
+
+  setTopography(config: TGenerationConfig, entry: TTopographyCacheEntry): void {
+    if (!this.options.enableStageCaching) return;
+    this.topographyCache.set(hashTopographyStage(config), entry);
+  }
+
+  getPostPopulation(config: TGenerationConfig): TPostPopulationCacheEntry | null {
+    if (!this.options.enableStageCaching) return null;
+    return this.postPopulationCache.get(hashPostPopulationStage(config));
+  }
+
+  setPostPopulation(config: TGenerationConfig, entry: TPostPopulationCacheEntry): void {
+    if (!this.options.enableStageCaching) return;
+    this.postPopulationCache.set(hashPostPopulationStage(config), entry);
   }
 
   /**
-   * Number of cached entries.
+   * Clear all cached results, at every granularity.
+   */
+  clear(): void {
+    this.cache.clear();
+    this.topographyCache.clear();
+    this.postPopulationCache.clear();
+  }
+
+  /**
+   * Number of cached full-result entries.
    */
   get size(): number {
     return this.cache.size;
@@ -156,7 +218,7 @@ export class CacheManager {
     return {
       size: this.cache.size,
       maxResults: this.options.maxResults,
-      keys: Array.from(this.cache.keys()),
+      keys: this.cache.keys(),
     };
   }
 }

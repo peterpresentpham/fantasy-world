@@ -1,9 +1,10 @@
-import { TPoint } from 'src/global';
+import { TPoint } from 'src/types/global';
+import { clamp } from 'src/services/utils/math';
 
 export type TRgbColor = { r: number; g: number; b: number };
 
 export function clamp01(value: number) {
-  return Math.max(0, Math.min(1, value));
+  return clamp(value, 0, 1);
 }
 
 function interpolateChannel(start: number, end: number, factor: number) {

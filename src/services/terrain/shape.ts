@@ -1,4 +1,4 @@
-import { TMesh } from 'src/global';
+import { TMesh } from 'src/types/global';
 import { distanceToSegment } from 'src/services/utils/geometry';
 import { clamp, smoothStep } from 'src/services/utils/math';
 

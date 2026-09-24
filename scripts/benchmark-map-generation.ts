@@ -6,7 +6,7 @@ import { buildHydrology } from 'src/services/hydrology';
 import { MapGenerator } from 'src/services/pipeline/MapGenerator';
 import { buildTopography } from 'src/services/terrain/buildTopography';
 import { buildMesh } from 'src/services/terrain/mesh';
-import { TGenerationConfig } from 'src/global';
+import { TGenerationConfig } from 'src/types/global';
 
 type TBenchConfig = {
   name: string;

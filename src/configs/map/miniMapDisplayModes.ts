@@ -1,4 +1,4 @@
-import { TDisplaySettings } from 'src/global';
+import { TDisplaySettings } from 'src/types/global';
 
 export const MINI_MAP_TERRAIN_DISPLAY: TDisplaySettings = {
   landform: true,

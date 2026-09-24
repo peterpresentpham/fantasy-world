@@ -20,21 +20,28 @@ type TProps = {
 };
 
 export default function useMapCanvas({ canvasRef }: TProps) {
-  const { displaySettings, seaLevel } = useMapExplorerStore();
+  const displaySettings = useMapExplorerStore((s) => s.displaySettings);
+  const seaLevel = useMapExplorerStore((s) => s.seaLevel);
   const {
     enabled: logisticsEnabled,
     startCellId,
     goalCellId,
     routeCellIds,
   } = useLogisticsGameStore();
-  const { mesh } = useMapContext();
+  const { mesh, paintVersion } = useMapContext();
   const { cells, width, height, nations, ethnics } = mesh;
   const isIso = displaySettings.isometric;
   const isThree = displaySettings.threeDim;
   const elevScale = DEFAULT_ELEV_SCALE;
 
-  const waterCells = useMemo(() => cells.filter((c) => !isLandCell(c)), [cells]);
-  const landCells = useMemo(() => cells.filter((c) => isLandCell(c)), [cells]);
+  // `cells` keeps the same array reference across terrain-paint strokes
+  // (cells are mutated in place) — paintVersion is an intentional extra dep
+  // that forces these to recompute when painted content changes, without
+  // copying the whole cells array on every stroke.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const waterCells = useMemo(() => cells.filter((c) => !isLandCell(c)), [cells, paintVersion]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const landCells = useMemo(() => cells.filter((c) => isLandCell(c)), [cells, paintVersion]);
 
   const layerPlan = useMemo(
     () => createLayerPlan(displaySettings, cells.length),
@@ -43,7 +50,8 @@ export default function useMapCanvas({ canvasRef }: TProps) {
 
   const isoDims = useMemo(
     () => getIsoCanvasDims(cells, elevScale, isIso),
-    [cells, elevScale, isIso]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cells, elevScale, isIso, paintVersion]
   );
 
   const sortedLandCells = useMemo(

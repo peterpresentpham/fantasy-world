@@ -12,17 +12,22 @@ import {
   useState,
 } from 'react';
 import { DEFAULT_CONFIG } from 'src/configs/map/common';
-import { MapGenerator } from 'src/services/pipeline/MapGenerator';
-import { computeTargetElevation, inferBiomeForLandform } from 'src/services/terrain/terrainPainter';
+import { generateInWorker } from 'src/services/pipeline/generationClient';
+import { parseSnapshot } from 'src/services/pipeline/snapshot';
+import { paintCellTerrain } from 'src/services/terrain/paint';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
 import { useTerrainEditorStore } from 'src/store/terrainEditorStore';
-import { TDelaunayMesh, TExportSnapshot, TLandform, TTerrainOverride } from 'src/global';
+import { TDelaunayMesh, TExportSnapshot, TLandform, TTerrainOverride } from 'src/types/global';
 
 interface TMapContextType {
   mesh: TDelaunayMesh;
   isGenerating: boolean;
+  // Bumped on each terrain-paint stroke — cells are mutated in place during
+  // painting (see paintTerrain), so `mesh`/`mesh.cells` keep the same
+  // reference; consumers that need to reflect live paint edits should depend
+  // on this instead of re-deriving from a copied cells array every stroke.
+  paintVersion: number;
   importFromSnapshot: (snapshot: TExportSnapshot) => { ok: true } | { ok: false; error: string };
-  handlePointerMove: (x: number, y: number) => void;
   handleCellCountChange: (nextValue: number) => void;
   paintTerrain: (cellId: number, landform: TLandform) => void;
   clearTerrainPaints: () => void;
@@ -44,8 +49,8 @@ const mapContextDefault: TMapContextType = {
     delaunay: Delaunay.from([[0, 0]]),
   },
   isGenerating: true,
+  paintVersion: 0,
   importFromSnapshot: () => ({ ok: false, error: 'Map context not ready' }),
-  handlePointerMove: () => {},
   handleCellCountChange: () => {},
   paintTerrain: () => {},
   clearTerrainPaints: () => {},
@@ -68,6 +73,8 @@ export default function MapProvider({ children }: TProps) {
   const [activePaintCount, setActivePaintCount] = useState(0);
   // Bump to force re-generation when Apply is pressed
   const [generationNonce, setGenerationNonce] = useState(0);
+  // Bump on each paint stroke — see TMapContextType.paintVersion above
+  const [paintVersion, setPaintVersion] = useState(0);
 
   const {
     seed,
@@ -87,25 +94,11 @@ export default function MapProvider({ children }: TProps) {
 
   const importFromSnapshot = useCallback(
     (snapshot: TExportSnapshot) => {
-      if (snapshot.schemaVersion !== 1)
-        return { ok: false as const, error: 'Unsupported schema version' };
-
-      if (
-        !snapshot.mesh ||
-        !Array.isArray(snapshot.mesh.cells) ||
-        snapshot.mesh.cells.length === 0
-      ) {
-        return { ok: false as const, error: 'Invalid mesh payload' };
-      }
-
-      const nextMesh: TDelaunayMesh = {
-        ...snapshot.mesh,
-        rivers: snapshot.mesh.rivers || [],
-        delaunay: Delaunay.from(snapshot.mesh.cells.map((cell) => cell.site)),
-      };
+      const result = parseSnapshot(snapshot);
+      if (!result.ok) return result;
 
       generationIdRef.current += 1;
-      setMesh(nextMesh);
+      setMesh(result.mesh);
       setIsGenerating(false);
       setHoverIndex(null);
       return { ok: true as const };
@@ -118,11 +111,11 @@ export default function MapProvider({ children }: TProps) {
     const generationId = generationIdRef.current;
     setIsGenerating(true);
 
-    const timer = window.setTimeout(() => {
-      // Read locked overrides at generation time (not from closure)
-      const lockedOverrides = useTerrainEditorStore.getState().lockedOverrides;
+    // Read locked overrides at generation time (not from closure)
+    const lockedOverrides = useTerrainEditorStore.getState().lockedOverrides;
 
-      const generator = new MapGenerator({
+    generateInWorker(
+      {
         width: DEFAULT_CONFIG.width,
         height: DEFAULT_CONFIG.height,
         seed,
@@ -131,34 +124,26 @@ export default function MapProvider({ children }: TProps) {
         topography,
         nationCount,
         climateControl,
+      },
+      lockedOverrides
+    )
+      .then(({ geopolitics }) => {
+        if (generationId !== generationIdRef.current) return;
+
+        // Reset active paints — locked overrides are now baked into the new mesh
+        originalElevationsRef.current.clear();
+        activePaintsRef.current = {};
+        setActivePaintCount(0);
+
+        setMesh(geopolitics);
+        setIsGenerating(false);
+      })
+      .catch((error: unknown) => {
+        if (generationId !== generationIdRef.current) return;
+        console.error('Map generation failed', error);
+        setIsGenerating(false);
       });
-
-      const { geopolitics } = generator.generate(lockedOverrides);
-
-      if (generationId !== generationIdRef.current) return;
-
-      // Reset active paints — locked overrides are now baked into the new mesh
-      originalElevationsRef.current.clear();
-      activePaintsRef.current = {};
-      setActivePaintCount(0);
-
-      setMesh(geopolitics);
-      setIsGenerating(false);
-    }, 0);
-
-    return () => {
-      window.clearTimeout(timer);
-    };
   }, [cellCount, climateControl, nationCount, seaLevel, seed, topography, generationNonce]);
-
-  const handlePointerMove = useCallback(
-    (x: number, y: number) => {
-      if (mesh.cells.length === 0) return;
-      const i = mesh.delaunay.find(x, y);
-      setHoverIndex(i);
-    },
-    [mesh.cells.length, mesh.delaunay, setHoverIndex]
-  );
 
   const handleCellCountChange = useCallback(
     (nextValue: number) => {
@@ -169,47 +154,32 @@ export default function MapProvider({ children }: TProps) {
 
   const paintTerrain = useCallback(
     (cellId: number, landform: TLandform) => {
-      const cell = mesh.cells[cellId];
-      if (!cell) return;
-
       if (!originalElevationsRef.current.has(cellId)) {
+        const cell = mesh.cells[cellId];
+        if (!cell) return;
         originalElevationsRef.current.set(cellId, cell.elevation);
       }
 
-      const newElevation = computeTargetElevation(
+      const override = paintCellTerrain(
+        mesh.cells,
+        cellId,
         landform,
         seaLevel,
-        cell.site,
+        seed,
         mesh.width,
         mesh.height,
-        seed,
-        cellId
+        originalElevationsRef.current
       );
-      const newIsWater = newElevation < seaLevel;
-
-      cell.elevation = newElevation;
-      cell.isWater = newIsWater;
-      cell.landform = landform;
-      cell.biome = inferBiomeForLandform(
-        landform,
-        cell.temperature,
-        cell.precipitation,
-        cell.biome
-      );
+      if (!override) return;
 
       // Track this paint as an active (unapplied) override
       const isNew = !(cellId in activePaintsRef.current);
-      activePaintsRef.current[cellId] = { elevation: newElevation, landform, isWater: newIsWater };
+      activePaintsRef.current[cellId] = override;
       if (isNew) setActivePaintCount((n) => n + 1);
 
-      // Soft blend into immediate neighbors to avoid hard cliff edges
-      for (const neighborId of cell.neighbors) {
-        const nb = mesh.cells[neighborId];
-        if (!nb || originalElevationsRef.current.has(neighborId)) continue;
-        nb.elevation = nb.elevation * 0.88 + newElevation * 0.12;
-      }
-
-      setMesh((prev) => ({ ...prev, cells: [...prev.cells] }));
+      // Cells are mutated in place above — bump the version instead of
+      // copying the (up to 15k-entry) cells array to signal the change.
+      setPaintVersion((v) => v + 1);
     },
     [mesh, seaLevel, seed]
   );
@@ -244,8 +214,8 @@ export default function MapProvider({ children }: TProps) {
     return {
       mesh,
       isGenerating,
+      paintVersion,
       importFromSnapshot,
-      handlePointerMove,
       handleCellCountChange,
       paintTerrain,
       clearTerrainPaints,
@@ -256,8 +226,8 @@ export default function MapProvider({ children }: TProps) {
   }, [
     mesh,
     isGenerating,
+    paintVersion,
     importFromSnapshot,
-    handlePointerMove,
     handleCellCountChange,
     paintTerrain,
     clearTerrainPaints,

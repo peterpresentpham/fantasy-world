@@ -4,7 +4,7 @@ import { Group } from '@visx/group';
 import { Pie } from '@visx/shape';
 import { type ReactNode, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TBaseChartData, TPieChartData } from 'src/global';
+import { TBaseChartData, TPieChartData } from 'src/types/global';
 
 type TPieTooltipData<T extends TPieChartData> = {
   datum: T;

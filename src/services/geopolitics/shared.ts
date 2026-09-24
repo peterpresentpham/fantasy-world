@@ -1,5 +1,5 @@
 import { BORDER_CONFIG } from 'src/configs/map/geopolitics';
-import { TBorderType, TCell, TLandform, TZoneType } from 'src/global';
+import { TBorderType, TCell, TLandform, TZoneType } from 'src/types/global';
 import { collectConnectedComponents } from 'src/services/utils/graph';
 import { createSeededRandom, hashSeed } from 'src/services/utils/math';
 import Cost from './cost';

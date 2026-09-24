@@ -11,6 +11,14 @@ export function normalize(value: number, min: number, max: number) {
   return (value - min) / (max - min + 1e-9);
 }
 
+/**
+ * Triangular "tent" score: 1 at value === ideal, falling off linearly to 0 at
+ * `tolerance` distance away (clamped to [0, 1] past that).
+ */
+export function tentScore(value: number, ideal: number, tolerance: number) {
+  return clamp(1 - Math.abs(value - ideal) / tolerance, 0, 1);
+}
+
 export function dot(x1: number, y1: number, x2: number, y2: number) {
   return x1 * x2 + y1 * y2;
 }

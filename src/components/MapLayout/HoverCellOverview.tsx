@@ -17,7 +17,7 @@ type TGroupedRow = { label: string; value: string; accent?: boolean };
 export default function HoverCellOverview() {
   const hoverIndex = useMapExplorerStore((s) => s.hoverIndex);
   const cellDataEnabled = useMapExplorerStore((s) => s.displaySettings.cellData);
-  const { mesh } = useMapContext();
+  const { mesh, paintVersion } = useMapContext();
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
   const [delayedHoverIndex, setDelayedHoverIndex] = useState<number | null>(null);
   const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null);
@@ -55,7 +55,8 @@ export default function HoverCellOverview() {
     const nextCell = delayedHoverIndex !== null ? mesh.cells[delayedHoverIndex] : null;
     if (nextCell) return { cell: nextCell, description: describeCell(nextCell) };
     return { cell: undefined, description: undefined };
-  }, [delayedHoverIndex, mesh]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [delayedHoverIndex, mesh, paintVersion]);
 
   const rows = useMemo<TGroupedRow[]>(() => {
     if (!description) return [];

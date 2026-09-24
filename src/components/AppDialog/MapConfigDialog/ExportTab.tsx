@@ -1,6 +1,6 @@
 'use client';
 
-import { ChangeEventHandler } from 'react';
+import { ChangeEventHandler, useState } from 'react';
 import BlurCard from 'src/components/BlurCard';
 import { Button } from 'src/components/ui/button';
 import { Input } from 'src/components/ui/input';
@@ -11,7 +11,7 @@ import {
   exportTextFile,
 } from 'src/services/rendering/pipeline/exportPipeline';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
-import { TExportSnapshot } from 'src/global';
+import { TExportSnapshot } from 'src/types/global';
 
 function makeTimestamp() {
   return new Date().toISOString().replace(/[:.]/g, '-');
@@ -21,6 +21,7 @@ export default function ExportTab() {
   const { mesh, importFromSnapshot } = useMapContext();
   const { seed, cellCount, seaLevel, topography, nationCount, climateControl, displaySettings } =
     useMapExplorerStore();
+  const [importError, setImportError] = useState<string | null>(null);
 
   const handleExportPng = () => {
     exportCanvasToPng('map-base-canvas', `fantasy-map-${makeTimestamp()}.png`);
@@ -69,15 +70,16 @@ export default function ExportTab() {
     const file = event.target.files?.[0];
     event.target.value = '';
     if (!file) return;
+    setImportError(null);
     const content = await file.text();
     try {
       const payload = JSON.parse(content) as TExportSnapshot;
       const result = importFromSnapshot(payload);
       if (!result.ok) {
-        window.alert(result.error);
+        setImportError(result.error);
       }
     } catch {
-      window.alert('Invalid JSON file.');
+      setImportError('Invalid JSON file.');
     }
   };
 
@@ -101,6 +103,14 @@ export default function ExportTab() {
       <BlurCard title="Import Data">
         <label className="fantasy-text-muted block text-xs">Import JSON Schema</label>
         <Input type="file" accept="application/json,.json" onChange={handleImportJson} />
+        {importError && (
+          <p
+            role="alert"
+            className="bg-destructive/10 text-destructive mt-2 rounded-md px-2 py-1.5 text-xs"
+          >
+            {importError}
+          </p>
+        )}
       </BlurCard>
     </div>
   );

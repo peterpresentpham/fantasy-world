@@ -1,6 +1,6 @@
 import { TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
 import { clamp } from 'src/services/utils/math';
-import { TDelaunayMesh, TTopographyCell, TTopographyParams } from 'src/global';
+import { TDelaunayMesh, TTopographyCell, TTopographyParams } from 'src/types/global';
 import { computeBaseElevations } from './computeElevation';
 import { simulateHydraulicErosion } from './erosion';
 import { applyTopography } from './preset';

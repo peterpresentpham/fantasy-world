@@ -1,6 +1,6 @@
 import { BIOME_CONFIG, LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { clamp } from 'src/services/utils/math';
-import { TCell, TCellDescription } from 'src/global';
+import { TCell, TCellDescription } from 'src/types/global';
 
 export function describeCell(cell: TCell): TCellDescription {
   const terrainType = LANDFORM_CONFIG[cell.landform].label;

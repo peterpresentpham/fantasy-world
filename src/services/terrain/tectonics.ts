@@ -1,5 +1,5 @@
 import { createSeededRandom } from 'src/services/utils/math';
-import { TPoint } from 'src/global';
+import { TPoint } from 'src/types/global';
 
 type TPlateKind = 'continental' | 'oceanic';
 type TBoundaryKind = 'divergent' | 'convergent' | 'transform' | 'none';

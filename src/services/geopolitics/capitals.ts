@@ -4,7 +4,7 @@ import { getMetricRange } from 'src/services/utils';
 import { isWaterOrRiverCell } from 'src/services/utils/cell';
 import { buildDistanceMap, collectConnectedComponents } from 'src/services/utils/graph';
 import { createSeededRandom, normalize } from 'src/services/utils/math';
-import { TCell, TNation } from 'src/global';
+import { TCell, TNation } from 'src/types/global';
 import { CAPITAL_VIEWPORT_MARGIN, createRegionalName, isLand } from './shared';
 
 type TNationProfile = Pick<TNation, 'populationMultiplier' | 'economyMultiplier'>;

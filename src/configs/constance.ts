@@ -1,4 +1,4 @@
-import type { TSiteMetadata, TTopographyOption } from 'src/global';
+import type { TSiteMetadata, TTopographyOption } from 'src/types/global';
 import { TOPOGRAPHY_PRESET_CONFIG } from './map/topography';
 import { ImageAsset } from './ImageAssets';
 

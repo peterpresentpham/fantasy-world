@@ -1,4 +1,4 @@
-import { TCell, TLine, TPoint } from 'src/global';
+import { TCell, TLine, TPoint } from 'src/types/global';
 import { clamp } from './math';
 
 type TPointKeyOptions = {

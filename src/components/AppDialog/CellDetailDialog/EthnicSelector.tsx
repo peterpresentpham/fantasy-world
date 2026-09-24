@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from 'src/components/ui/select';
 import { getNationColor } from 'src/services/utils';
-import { TEthnic } from 'src/global';
+import { TEthnic } from 'src/types/global';
 
 type TProps = {
   ethnics: TEthnic[];

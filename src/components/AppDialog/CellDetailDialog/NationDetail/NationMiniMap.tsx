@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import BlurCard from 'src/components/BlurCard';
 import { Button } from 'src/components/ui/button';
 import { ButtonGroup } from 'src/components/ui/button-group';
-import { TDelaunayMesh } from 'src/global';
+import { TDelaunayMesh } from 'src/types/global';
 import useNationMiniMap, { TNationMiniMapDisplay } from 'src/hooks/useNationMiniMap';
 
 type TProps = {

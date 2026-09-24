@@ -1,5 +1,5 @@
 import { NATION_COLORS } from 'src/configs/map/common';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 
 export function toPercent(count: number, total: number) {
   return parseFloat(((count / Math.max(1, total)) * 100).toFixed(2));

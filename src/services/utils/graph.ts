@@ -1,4 +1,4 @@
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 import { TDeterministicMinHeap, TFifoQueue } from './collections';
 
 type TTraversalWorkspace = {

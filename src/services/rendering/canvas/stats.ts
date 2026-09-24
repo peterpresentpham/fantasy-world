@@ -1,6 +1,6 @@
 'use client';
 
-import { TCell, TCellStats, TDisplaySettings } from 'src/global';
+import { TCell, TCellStats, TDisplaySettings } from 'src/types/global';
 
 const DEFAULT_CELL_STATS: TCellStats = {
   minPopulation: Number.POSITIVE_INFINITY,

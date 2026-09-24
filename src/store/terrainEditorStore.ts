@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { TLandform, TTerrainOverride } from 'src/global';
+import { TLandform, TTerrainOverride } from 'src/types/global';
 
 type TTerrainEditorStore = {
   editMode: boolean;

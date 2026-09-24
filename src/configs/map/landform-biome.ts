@@ -1,4 +1,4 @@
-import { TBiome, TLandform } from 'src/global';
+import { TBiome, TLandform } from 'src/types/global';
 
 type TBaseConfig = {
   label: string;

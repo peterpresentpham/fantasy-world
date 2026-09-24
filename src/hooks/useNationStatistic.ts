@@ -2,7 +2,7 @@
 
 import { useMemo } from 'react';
 import { toPercent } from 'src/services/utils';
-import { TCell, TDelaunayMesh, TNation, TTerranStatisticData } from 'src/global';
+import { TCell, TDelaunayMesh, TNation, TTerranStatisticData } from 'src/types/global';
 
 export type TNationEthnicData = {
   id: number;

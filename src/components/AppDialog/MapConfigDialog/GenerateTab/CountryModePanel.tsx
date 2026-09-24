@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import BlurCard from 'src/components/BlurCard';
-import { Input } from 'src/components/ui/input';
 import { Button } from 'src/components/ui/button';
+import { Input } from 'src/components/ui/input';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
 
 export default function CountryModePanel() {

@@ -1,5 +1,5 @@
 import { BORDER_CONFIG } from 'src/configs/map/geopolitics';
-import { TBorderType, TCell } from 'src/global';
+import { TBorderType, TCell } from 'src/types/global';
 import { isLand } from './shared';
 
 export default class Cost {

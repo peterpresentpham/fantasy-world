@@ -9,7 +9,7 @@ import {
 } from 'src/components/ui/select';
 import { TOPOGRAPHY_OPTIONS } from 'src/configs/constance';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
-import { TTopography } from 'src/global';
+import { TTopography } from 'src/types/global';
 
 export default function TopographySelect() {
   const { topography, setTopography } = useMapExplorerStore();

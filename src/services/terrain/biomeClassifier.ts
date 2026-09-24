@@ -1,5 +1,5 @@
 import { BIOME_THRESHOLDS as BIOME_CONFIG } from 'src/configs/map/terrain';
-import { TBiome, TLandform } from 'src/global';
+import { TBiome, TLandform } from 'src/types/global';
 import { clamp } from 'src/services/utils/math';
 
 type TClassifyBiomesInput = {

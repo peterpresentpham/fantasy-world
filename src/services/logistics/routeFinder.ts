@@ -1,6 +1,6 @@
 import Cost from 'src/services/geopolitics/cost';
 import { TDeterministicMinHeap } from 'src/services/utils/collections';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 
 type TLogisticsRouteResult = {
   pathCellIds: number[];

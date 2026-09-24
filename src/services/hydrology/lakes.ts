@@ -1,7 +1,7 @@
 import { HYDROLOGY_CONFIG, LAKE_CONFIG } from 'src/configs/map/hydrology';
 import { TFifoQueue } from 'src/services/utils/collections';
 import { collectConnectedComponents, floodFromSeeds } from 'src/services/utils/graph';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 
 const T_COAST_OUTLET = HYDROLOGY_CONFIG.coastOutletId;
 const traversalWorkspace = {};

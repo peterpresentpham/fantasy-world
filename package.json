@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "analyze": "next experimental-analyze",
     "start": "next start",
     "test": "vitest run",
     "test:watch": "vitest",

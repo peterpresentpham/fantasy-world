@@ -1,4 +1,4 @@
-import { TCell, TPoint } from 'src/global';
+import { TCell, TPoint } from 'src/types/global';
 import { getNationColor } from 'src/services/utils';
 import { toEdgeKey } from 'src/services/utils/geometry';
 import { drawPolygon, edgeNoiseValue } from './shared';

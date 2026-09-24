@@ -1,7 +1,7 @@
 import { LANDFORM_CLASSIFIER_CONFIG, LANDFORM_ELEVATION_BANDS } from 'src/configs/map/terrain';
 import { classifyLandformWater } from 'src/services/utils/cell';
 import { clamp } from 'src/services/utils/math';
-import { TCell, TLandform, TTerrain } from 'src/global';
+import { TCell, TLandform, TTerrain } from 'src/types/global';
 
 type TClassifyLandformsParams = {
   cells: TCell[];

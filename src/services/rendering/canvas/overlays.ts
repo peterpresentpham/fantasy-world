@@ -1,5 +1,5 @@
 /* eslint-disable quotes */
-import { TEthnic, TCell, TNation } from 'src/global';
+import { TEthnic, TCell, TNation } from 'src/types/global';
 import { isLandCell } from './borders';
 
 type TLabelMode = 'nation' | 'ethnic';

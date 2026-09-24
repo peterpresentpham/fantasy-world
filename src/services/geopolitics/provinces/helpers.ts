@@ -8,7 +8,7 @@ import {
   SMALL_NATION_MIN_PROVINCE_POPULATION,
   SMALL_NATION_POPULATION_THRESHOLD,
 } from 'src/configs/map/geopolitics';
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 import { clamp } from 'src/services/utils/math';
 
 /** Terrain-adjusted management weight for province size calculations. */

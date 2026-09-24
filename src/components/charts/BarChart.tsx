@@ -2,7 +2,7 @@
 
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { TBarChartData, TBaseChartData } from 'src/global';
+import { TBarChartData, TBaseChartData } from 'src/types/global';
 
 type TBarTooltipData<T extends TBarChartData> = {
   datum: T;

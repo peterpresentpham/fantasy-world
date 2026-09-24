@@ -1,8 +1,8 @@
 import { BIOME_CONFIG } from 'src/configs/map/landform-biome';
-import { TBiome, TCell, TDelaunayMesh, TLandform } from 'src/global';
+import { TBiome, TCell, TDelaunayMesh, TLandform } from 'src/types/global';
 import { isWaterOrRiverCell } from 'src/services/utils/cell';
 import { buildDistanceMap } from 'src/services/utils/graph';
-import { clamp, createSeededRandom } from 'src/services/utils/math';
+import { clamp, createSeededRandom, tentScore } from 'src/services/utils/math';
 
 interface TPopulationParams {
   mesh: TDelaunayMesh;
@@ -118,18 +118,22 @@ function carryingCapacity(cell: TCell): number {
   return clamp(base + bonus, 0.02, 2.0);
 }
 
+// Population-specific climate fitness — separately tuned from
+// hydrology/climate.ts's getSuitabilityByLandformBiome (general terrain
+// suitability, different ideal points/weights). Kept distinct rather than
+// unified: the two formulas feed deterministic, hash-verified generation
+// output, and their arithmetic forms aren't guaranteed bit-identical once
+// merged.
 function climateSuitability(cell: TCell) {
-  const tScore = clamp(
-    1 - Math.abs(cell.temperature - POP_MODEL.climate.tempIdeal) / POP_MODEL.climate.tempTolerance,
-    0,
-    1
+  const tScore = tentScore(
+    cell.temperature,
+    POP_MODEL.climate.tempIdeal,
+    POP_MODEL.climate.tempTolerance
   );
-  const pScore = clamp(
-    1 -
-      Math.abs(cell.precipitation - POP_MODEL.climate.precipIdeal) /
-        POP_MODEL.climate.precipTolerance,
-    0,
-    1
+  const pScore = tentScore(
+    cell.precipitation,
+    POP_MODEL.climate.precipIdeal,
+    POP_MODEL.climate.precipTolerance
   );
   return Math.max(0.08, tScore * 0.55 + pScore * 0.45);
 }

@@ -1,6 +1,6 @@
 import { LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { getRiverStrokeWidth } from 'src/services/utils';
-import { TCell, TCellStats, TDisplaySettings } from 'src/global';
+import { TCell, TCellStats, TDisplaySettings } from 'src/types/global';
 import {
   getBiomeColor,
   getEconomyColor,
@@ -110,6 +110,39 @@ export function renderWaterCells(
   }
 }
 
+type TLandLayer =
+  | 'none'
+  | 'landform'
+  | 'biome'
+  | 'population'
+  | 'precipitation'
+  | 'rainShadow'
+  | 'temperature'
+  | 'economy'
+  | 'uniform';
+
+/**
+ * Display-mode checkboxes aren't mutually exclusive in the UI, but each
+ * fill below is drawn fully opaque, so when several are enabled at once
+ * only the last-enabled one ends up visible. This picks that single
+ * winning layer up front instead of drawing (and fully overpainting) every
+ * enabled layer in turn.
+ */
+function resolveActiveLandLayer(
+  displaySettings: TDisplaySettings,
+  layerPlan: TLayerPlan
+): TLandLayer {
+  let active: TLandLayer = layerPlan.showUniformLand ? 'uniform' : 'none';
+  if (displaySettings.landform || layerPlan.showLandformReliefBase) active = 'landform';
+  if (displaySettings.biome || layerPlan.showBiomeReliefBase) active = 'biome';
+  if (displaySettings.population) active = 'population';
+  if (displaySettings.precipitation) active = 'precipitation';
+  if (displaySettings.rainShadow) active = 'rainShadow';
+  if (displaySettings.temperature) active = 'temperature';
+  if (displaySettings.economy) active = 'economy';
+  return active;
+}
+
 export function renderLandCells(
   context: CanvasRenderingContext2D,
   landCells: TCell[],
@@ -118,97 +151,54 @@ export function renderLandCells(
   mapCellStats: TCellStats,
   seaLevel: number
 ) {
-  if (displaySettings.landform || layerPlan.showLandformReliefBase) {
-    for (const cell of landCells) {
-      drawCellShape(
-        context,
-        cell,
-        LANDFORM_CONFIG[cell.landform].color,
-        1,
-        T_TRANSPARENT_STROKE,
-        0
-      );
-    }
-  }
+  const activeLayer = resolveActiveLandLayer(displaySettings, layerPlan);
+  if (activeLayer === 'none') return;
 
-  if (displaySettings.biome || layerPlan.showBiomeReliefBase) {
-    for (const cell of landCells) {
-      drawCellShape(context, cell, getBiomeColor(cell, seaLevel), 1, T_TRANSPARENT_STROKE, 0);
+  for (const cell of landCells) {
+    let color: string;
+    switch (activeLayer) {
+      case 'landform':
+        color = LANDFORM_CONFIG[cell.landform].color;
+        break;
+      case 'biome':
+        color = getBiomeColor(cell, seaLevel);
+        break;
+      case 'population':
+        color = getPopulationColor(
+          cell.population,
+          mapCellStats.minPopulation,
+          mapCellStats.maxPopulation
+        );
+        break;
+      case 'precipitation':
+        color = getPrecipitationColor(cell.precipitation);
+        break;
+      case 'rainShadow':
+        color = getRainShadowColor(cell.rainShadow);
+        break;
+      case 'temperature':
+        color = getTemperatureColor(
+          cell.temperature,
+          mapCellStats.minTemperature,
+          mapCellStats.maxTemperature
+        );
+        break;
+      case 'economy':
+        color = getEconomyColor(cell.economy, mapCellStats.minEconomy, mapCellStats.maxEconomy);
+        break;
+      case 'uniform':
+      default:
+        color = T_UNIFORM_LAND_COLOR;
+        break;
     }
-    for (const cell of landCells) {
+    drawCellShape(context, cell, color, 1, T_TRANSPARENT_STROKE, 0);
+
+    if (activeLayer === 'biome') {
       const elevNorm = (cell.elevation - seaLevel) / Math.max(1 - seaLevel, 0.001);
       if (elevNorm < 0.52 || cell.temperature > 0.3) continue;
       const snowAlpha = clamp01((elevNorm - 0.52) * 2.8 + (0.3 - cell.temperature) * 2.0) * 0.8;
       if (snowAlpha < 0.05) continue;
       drawCellShape(context, cell, '#e8f4fd', snowAlpha, T_TRANSPARENT_STROKE, 0);
-    }
-  }
-
-  if (displaySettings.population) {
-    for (const cell of landCells) {
-      drawCellShape(
-        context,
-        cell,
-        getPopulationColor(cell.population, mapCellStats.minPopulation, mapCellStats.maxPopulation),
-        1,
-        T_TRANSPARENT_STROKE,
-        0
-      );
-    }
-  }
-
-  if (displaySettings.precipitation) {
-    for (const cell of landCells) {
-      drawCellShape(
-        context,
-        cell,
-        getPrecipitationColor(cell.precipitation),
-        1,
-        T_TRANSPARENT_STROKE,
-        0
-      );
-    }
-  }
-
-  if (displaySettings.rainShadow) {
-    for (const cell of landCells) {
-      drawCellShape(context, cell, getRainShadowColor(cell.rainShadow), 1, T_TRANSPARENT_STROKE, 0);
-    }
-  }
-
-  if (displaySettings.temperature) {
-    for (const cell of landCells) {
-      drawCellShape(
-        context,
-        cell,
-        getTemperatureColor(
-          cell.temperature,
-          mapCellStats.minTemperature,
-          mapCellStats.maxTemperature
-        ),
-        1,
-        T_TRANSPARENT_STROKE,
-        0
-      );
-    }
-  }
-
-  if (displaySettings.economy) {
-    for (const cell of landCells) {
-      drawCellShape(
-        context,
-        cell,
-        getEconomyColor(cell.economy, mapCellStats.minEconomy, mapCellStats.maxEconomy),
-        1,
-        T_TRANSPARENT_STROKE,
-        0
-      );
-    }
-  }
-
-  if (layerPlan.showUniformLand) {
-    for (const cell of landCells) {
-      drawCellShape(context, cell, T_UNIFORM_LAND_COLOR, 1, T_TRANSPARENT_STROKE, 0);
     }
   }
 }

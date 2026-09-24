@@ -1,4 +1,4 @@
-import { TBorderConfig, TBorderType } from 'src/global';
+import { TBorderConfig, TBorderType } from 'src/types/global';
 
 export const BORDER_CONFIG: Record<TBorderType, TBorderConfig> = {
   nation: {

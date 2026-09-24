@@ -1,5 +1,5 @@
 import { MERGE_POP_CAP, MIN_POP_PERCENT, PROVINCE_TUNING } from 'src/configs/map/geopolitics';
-import { TCell, TCellOwnerParams } from 'src/global';
+import { TCell, TCellOwnerParams } from 'src/types/global';
 import { findNearestCell } from 'src/services/utils/geometry';
 import { getOwnerLandCellIds, reassignDisconnectedFragments } from '../shared';
 import {

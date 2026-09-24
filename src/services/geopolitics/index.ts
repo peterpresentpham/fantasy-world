@@ -1,5 +1,11 @@
 import { createSeededRandom } from 'src/services/utils/math';
-import { TCell, TCellOwnerParams, TDelaunayMesh, TEthnic, TGeopoliticsParams } from 'src/global';
+import {
+  TCell,
+  TCellOwnerParams,
+  TDelaunayMesh,
+  TEthnic,
+  TGeopoliticsParams,
+} from 'src/types/global';
 import { pickEconomicAndCapital } from './capitals';
 import { buildEthnicRegions } from './ethnic';
 import {

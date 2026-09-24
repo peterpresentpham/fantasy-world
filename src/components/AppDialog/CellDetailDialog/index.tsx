@@ -4,7 +4,15 @@ import { XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from 'src/components/ui/button';
 import { ButtonGroup } from 'src/components/ui/button-group';
-import { TDelaunayMesh } from 'src/global';
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from 'src/components/ui/dialog';
+import { TDelaunayMesh } from 'src/types/global';
 import useEthnicStatistic from 'src/hooks/useEthnicStatistic';
 import useNationStatistic from 'src/hooks/useNationStatistic';
 import { formatPopulation } from 'src/services/utils';
@@ -49,26 +57,16 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
     }
   }, [hasNation, hasEthnic]);
 
-  if (!open) return null;
-
   if (!hasNation && !hasEthnic) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30">
-        <section className="fantasy-panel relative w-[min(36rem,calc(100vw-2rem))] p-6">
-          <Button
-            type="button"
-            variant="ghost"
-            className="absolute top-2 right-2"
-            size="icon-sm"
-            onClick={() => onOpenAction(false)}
-          >
-            <XIcon />
-            <span className="sr-only">Close</span>
-          </Button>
-          <h2 className="text-lg font-medium">Cell Detail</h2>
-          <p className="fantasy-text-muted mt-2 text-sm">No data available for this cell.</p>
-        </section>
-      </div>
+      <Dialog open={open} onOpenChange={onOpenAction}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Cell Detail</DialogTitle>
+            <DialogDescription>No data available for this cell.</DialogDescription>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -80,8 +78,19 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
   const availableViews = views.filter((v) => v.available);
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/30">
-      <section className="relative mx-auto flex h-dvh w-dvw flex-col bg-black/30 md:my-4 md:h-[calc(100dvh-2rem)] md:w-[min(72rem,calc(100dvw-2rem))] md:rounded-xl md:bg-black/40">
+    <Dialog open={open} onOpenChange={onOpenAction}>
+      <DialogContent
+        showCloseButton={false}
+        overlayClassName="bg-black/30"
+        className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-dvw max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-none bg-black/30 p-0 md:inset-auto md:top-1/2 md:left-1/2 md:h-[calc(100dvh-2rem)] md:w-[min(72rem,calc(100dvw-2rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:bg-black/40"
+      >
+        <DialogTitle className="sr-only">
+          {view === 'nation' && nation ? `Nation #${nation.id} details` : 'Ethnic group details'}
+        </DialogTitle>
+        <DialogDescription className="sr-only">
+          Population, economy, and territory breakdown for the selected {view}.
+        </DialogDescription>
+
         {/* Header */}
         <div className="border-border flex items-center justify-between border-b px-4 py-3 md:px-6">
           <div className="min-w-0 flex-1 space-y-1">
@@ -127,15 +136,12 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
                 ))}
               </ButtonGroup>
             )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => onOpenAction(false)}
-            >
-              <XIcon />
-              <span className="sr-only">Close</span>
-            </Button>
+            <DialogClose asChild>
+              <Button type="button" variant="ghost" size="icon-sm">
+                <XIcon />
+                <span className="sr-only">Close</span>
+              </Button>
+            </DialogClose>
           </div>
         </div>
 
@@ -145,7 +151,7 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
           )}
           {view === 'ethnic' && ethnicData && <EthnicDetail data={ethnicData} mesh={mesh} />}
         </div>
-      </section>
-    </div>
+      </DialogContent>
+    </Dialog>
   );
 }

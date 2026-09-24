@@ -1,4 +1,9 @@
-import { TDelaunayMesh, TGenerationConfig, TGenerationStages, TTerrainOverride } from 'src/global';
+import {
+  TDelaunayMesh,
+  TGenerationConfig,
+  TGenerationStages,
+  TTerrainOverride,
+} from 'src/types/global';
 import { buildGeopolitics } from 'src/services/geopolitics';
 import { buildPopulation } from 'src/services/geopolitics/population';
 import { buildHydrology } from 'src/services/hydrology';
@@ -95,21 +100,45 @@ export class MapGenerator {
       lastMeshResult = { key: configKey, mesh: newMesh };
     }
 
-    const topography = buildTopography({ mesh, seed, seaLevel, topography: topographyPreset });
+    // Topography only depends on mesh + seaLevel + topography preset, so it
+    // can be reused across changes to nationCount/climateControl.
+    const cachedTopography =
+      !this.forceRefresh && !hasOverrides ? cache.getTopography(this.config) : null;
+    let topography: TDelaunayMesh;
+    if (cachedTopography) {
+      topography = cachedTopography.topography;
+    } else {
+      topography = buildTopography({ mesh, seed, seaLevel, topography: topographyPreset });
+      if (!hasOverrides) cache.setTopography(this.config, { topography });
+    }
 
     // Phase 1: inject painted elevations so river/climate generation uses them
     const topoForHydrology = hasOverrides
       ? injectElevationOverrides(topography, terrainOverrides)
       : topography;
 
-    const hydrology = buildHydrology({ mesh: topoForHydrology, seaLevel, seed, climateControl });
+    // Hydrology + population additionally depend on climateControl, so they
+    // can be reused across changes to nationCount alone — the only stage
+    // left that varies with it is geopolitics, below.
+    const cachedPostPopulation =
+      !this.forceRefresh && !hasOverrides ? cache.getPostPopulation(this.config) : null;
+    let hydrology: TDelaunayMesh;
+    let population: TDelaunayMesh;
+    if (cachedPostPopulation) {
+      hydrology = cachedPostPopulation.hydrology;
+      population = cachedPostPopulation.population;
+    } else {
+      hydrology = buildHydrology({ mesh: topoForHydrology, seaLevel, seed, climateControl });
 
-    // Phase 2: re-apply landform labels after hydrology re-classifies them
-    const hydrologyForPop = hasOverrides
-      ? applyLandformOverrides(hydrology, terrainOverrides)
-      : hydrology;
+      // Phase 2: re-apply landform labels after hydrology re-classifies them
+      const hydrologyForPop = hasOverrides
+        ? applyLandformOverrides(hydrology, terrainOverrides)
+        : hydrology;
 
-    const population = buildPopulation({ mesh: hydrologyForPop, seed });
+      population = buildPopulation({ mesh: hydrologyForPop, seed });
+      if (!hasOverrides) cache.setPostPopulation(this.config, { hydrology, population });
+    }
+
     const geopolitics = buildGeopolitics({ mesh: population, seed, nationCount });
 
     const result: TGenerationStages = {

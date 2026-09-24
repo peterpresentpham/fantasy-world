@@ -32,32 +32,35 @@ export default function LogisticsGamePanel() {
   return (
     <BlurCard title="Logistics">
       <div className="space-y-2">
-        <Input
-          type="checkbox"
-          checked={enabled}
-          onChange={(event) => setEnabled(event.target.checked)}
-          className="size-4 accent-sky-400"
-        />
-        <p className="text-xs text-slate-300">
+        <label className="flex cursor-pointer items-center gap-2 text-xs">
+          <Input
+            type="checkbox"
+            checked={enabled}
+            onChange={(event) => setEnabled(event.target.checked)}
+            className="size-4 accent-amber-500"
+          />
+          <span>Enable logistics game</span>
+        </label>
+        <p className="fantasy-text-muted text-xs">
           Click map cells: first click sets <b>Start</b>, second click sets <b>Goal</b>.
         </p>
 
-        <div className="grid grid-cols-2 gap-2 text-xs text-slate-200">
-          <span className="text-slate-400">Start</span>
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          <span className="fantasy-text-muted">Start</span>
           <span>{startCellId ?? '-'}</span>
-          <span className="text-slate-400">Goal</span>
+          <span className="fantasy-text-muted">Goal</span>
           <span>{goalCellId ?? '-'}</span>
-          <span className="text-slate-400">Budget</span>
+          <span className="fantasy-text-muted">Budget</span>
           <span>{budget}</span>
-          <span className="text-slate-400">Road Edges</span>
+          <span className="fantasy-text-muted">Road Edges</span>
           <span>{roadEdges.length}</span>
-          <span className="text-slate-400">Cost</span>
+          <span className="fantasy-text-muted">Cost</span>
           <span>{routeTotalCost.toFixed(2)}</span>
-          <span className="text-slate-400">Distance</span>
+          <span className="fantasy-text-muted">Distance</span>
           <span>{routeDistance}</span>
-          <span className="text-slate-400">Risk</span>
+          <span className="fantasy-text-muted">Risk</span>
           <span>{routeRisk.toFixed(2)}</span>
-          <span className="text-slate-400">Score</span>
+          <span className="fantasy-text-muted">Score</span>
           <span>{routeScore.toFixed(1)}</span>
         </div>
 

@@ -8,7 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from 'src/components/ui/select';
-import { TNation } from 'src/global';
+import { TNation } from 'src/types/global';
 import { getNationColor } from 'src/services/utils';
 
 type TProps = {

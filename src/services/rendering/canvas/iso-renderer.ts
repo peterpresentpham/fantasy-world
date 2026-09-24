@@ -13,7 +13,7 @@ import {
 } from 'src/services/rendering/canvas/heatmap';
 import { findSharedEdge, isoProjectCellPolygon } from 'src/services/rendering/canvas/isometric';
 import { drawPolygon } from 'src/services/rendering/canvas/shared';
-import { TCell, TCellStats, TDisplaySettings, TEthnic, TNation, TPoint } from 'src/global';
+import { TCell, TCellStats, TDisplaySettings, TEthnic, TNation, TPoint } from 'src/types/global';
 
 type TGetPtFn = (px: number, py: number, elev: number) => TPoint;
 type TGetPolyFn = (poly: TPoint[], elev: number) => TPoint[];

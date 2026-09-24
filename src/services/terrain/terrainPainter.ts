@@ -1,4 +1,4 @@
-import { TBiome, TLandform, TPoint } from 'src/global';
+import { TBiome, TLandform, TPoint } from 'src/types/global';
 import { clamp, hashSeed } from 'src/services/utils/math';
 import { createNoiseSampler } from './noise';
 

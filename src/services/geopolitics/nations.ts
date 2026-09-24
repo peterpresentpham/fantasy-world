@@ -1,5 +1,5 @@
 import { GEOPOLITICAL_CONFIG } from 'src/configs/map/geopolitics';
-import { TBorderType, TCell } from 'src/global';
+import { TBorderType, TCell } from 'src/types/global';
 import { sortDescStable } from 'src/services/utils';
 import { findNearestCell } from 'src/services/utils/geometry';
 import { runMultiSourceExpansion } from 'src/services/utils/graph';
@@ -329,8 +329,48 @@ function selectNationSeeds(
     let bestScore = -Infinity;
     let bestComponentId = -1;
 
+    // `alreadySeededInComponent` and the nearest-seeded-component/water-gap
+    // pair only depend on a candidate's componentId, not its cellId — cache
+    // them per component (there are far fewer land components than land
+    // cells) instead of recomputing per candidate every outer iteration.
+    const seedSet = new Set(seeds);
+    const alreadySeededByComponent = new Map<number, boolean>();
+    const nearestSeededGapByComponent = new Map<
+      number,
+      { nearestSeededComponentId: number; nearestWaterGap: number }
+    >();
+
+    const getAlreadySeededInComponent = (componentId: number) => {
+      let value = alreadySeededByComponent.get(componentId);
+      if (value === undefined) {
+        value = seeds.some((seedCellId) => connectivity.cellId[seedCellId] === componentId);
+        alreadySeededByComponent.set(componentId, value);
+      }
+      return value;
+    };
+
+    const getNearestSeededGap = (componentId: number) => {
+      let value = nearestSeededGapByComponent.get(componentId);
+      if (value === undefined) {
+        let nearestSeededComponentId = -1;
+        let nearestWaterGap = Number.POSITIVE_INFINITY;
+        for (const seedCellId of seeds) {
+          const seededComponentId = connectivity.cellId[seedCellId];
+          if (seededComponentId < 0 || seededComponentId === componentId) continue;
+          const gap = estimateWaterCells(cells, connectivity, componentId, seededComponentId);
+          if (gap < nearestWaterGap) {
+            nearestWaterGap = gap;
+            nearestSeededComponentId = seededComponentId;
+          }
+        }
+        value = { nearestSeededComponentId, nearestWaterGap };
+        nearestSeededGapByComponent.set(componentId, value);
+      }
+      return value;
+    };
+
     for (const candidate of sourceCandidates) {
-      if (seeds.includes(candidate.cellId)) continue;
+      if (seedSet.has(candidate.cellId)) continue;
       if (candidate.componentId < 0) continue;
 
       const point = cells[candidate.cellId].site;
@@ -347,26 +387,11 @@ function selectNationSeeds(
 
       const isLargeComponent = connectivity.largeComponentIds.has(candidate.componentId);
       const componentSize = connectivity.componentSizes[candidate.componentId] || 0;
-      const alreadySeededInComponent = seeds.some(
-        (seedCellId) => connectivity.cellId[seedCellId] === candidate.componentId
-      );
+      const alreadySeededInComponent = getAlreadySeededInComponent(candidate.componentId);
 
-      let nearestSeededComponentId = -1;
-      let nearestWaterGap = Number.POSITIVE_INFINITY;
-      for (const seedCellId of seeds) {
-        const seededComponentId = connectivity.cellId[seedCellId];
-        if (seededComponentId < 0 || seededComponentId === candidate.componentId) continue;
-        const gap = estimateWaterCells(
-          cells,
-          connectivity,
-          candidate.componentId,
-          seededComponentId
-        );
-        if (gap < nearestWaterGap) {
-          nearestWaterGap = gap;
-          nearestSeededComponentId = seededComponentId;
-        }
-      }
+      const { nearestSeededComponentId, nearestWaterGap } = getNearestSeededGap(
+        candidate.componentId
+      );
 
       // Soft geography bias:
       // - Large + far disconnected components: moderately prefer separate seeds.

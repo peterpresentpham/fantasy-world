@@ -1,4 +1,4 @@
-import { TCell } from 'src/global';
+import { TCell } from 'src/types/global';
 
 type TTerrainWaterClass = 'lake' | 'deep-water' | 'shallow-water';
 type TLandformWaterClass = 'lake' | 'marine_deep' | 'marine_shallow';

@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
-import { TCell, TDelaunayMesh, TEthnic, TTerranStatisticData } from 'src/global';
+import { TCell, TDelaunayMesh, TEthnic, TTerranStatisticData } from 'src/types/global';
 import { toPercent } from 'src/services/utils';
 
 export type TEthnicData = {
