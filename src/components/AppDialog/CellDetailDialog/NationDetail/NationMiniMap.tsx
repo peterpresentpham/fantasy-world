@@ -28,7 +28,7 @@ export default function NationMiniMap({ nationId, mesh }: TProps) {
   return (
     <BlurCard title="Map" containerProps={{ className: 'space-y-3' }}>
       <div className="flex justify-center">
-        <ButtonGroup>
+        <ButtonGroup className="w-full max-w-full flex-wrap justify-center">
           {DISPLAY_OPTIONS.map((opt) => (
             <Button
               key={opt.key}

@@ -71,25 +71,31 @@ export default function MapConfigDialog() {
               variant="line"
               className="fantasy-glass w-full flex-wrap justify-start gap-1 rounded-lg p-1.5 group-data-horizontal/tabs:h-auto"
             >
-              <TabsTrigger className="flex-none" value="generation">
+              {/* TabsTrigger's base style sets h-[calc(100%-1px)] (100% of
+                  TabsList), which assumes a single-row, fixed-height list.
+                  With TabsList wrapping to multiple rows at h-auto, that
+                  percentage creates a circular size dependency the browser
+                  resolves inconsistently — every trigger needs an explicit
+                  h-auto here to break the cycle. */}
+              <TabsTrigger className="h-auto flex-none py-1.5" value="generation">
                 Generation
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="display">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="display">
                 Display
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="nations">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="nations">
                 Nations
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="ethnic">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="ethnic">
                 Ethnic
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="terrain">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="terrain">
                 Edit Terrain
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="export">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="export">
                 Export
               </TabsTrigger>
-              <TabsTrigger className="flex-none" value="palette">
+              <TabsTrigger className="h-auto flex-none py-1.5" value="palette">
                 Palette
               </TabsTrigger>
             </TabsList>

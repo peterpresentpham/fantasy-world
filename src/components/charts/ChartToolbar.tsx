@@ -21,7 +21,7 @@ export default function ChartToolbar<TKey extends string>({
 }: TProps<TKey>) {
   return (
     <div className="flex flex-wrap items-center justify-center gap-2">
-      <ButtonGroup>
+      <ButtonGroup className="max-w-full flex-wrap justify-center">
         {options.map((opt) => (
           <Button
             key={opt.key}

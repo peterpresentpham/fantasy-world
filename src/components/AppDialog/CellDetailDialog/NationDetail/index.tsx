@@ -21,7 +21,7 @@ export default function NationDetail({ nation, data, mesh }: TProps) {
       <NationMiniMap nationId={nation.id} mesh={mesh} />
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <BlurCard title="Population">
-          <p className="mt-1 text-lg font-bold text-cyan-300">
+          <p className="mt-1 text-lg font-bold break-words text-cyan-300">
             {formatPopulation(data.population)}
           </p>
           <p className="text-xs text-slate-500">
@@ -29,7 +29,9 @@ export default function NationDetail({ nation, data, mesh }: TProps) {
           </p>
         </BlurCard>
         <BlurCard title="Economy">
-          <p className="mt-1 text-lg font-bold text-amber-300">{formatPopulation(data.economy)}</p>
+          <p className="mt-1 text-lg font-bold break-words text-amber-300">
+            {formatPopulation(data.economy)}
+          </p>
           <p className="text-xs text-slate-500">
             {(data.economy / Math.max(1, data.population)).toFixed(2)} / person
           </p>

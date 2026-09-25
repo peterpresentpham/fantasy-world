@@ -60,7 +60,7 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
   if (!hasNation && !hasEthnic) {
     return (
       <Dialog open={open} onOpenChange={onOpenAction}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="max-w-xl sm:max-w-none">
           <DialogHeader>
             <DialogTitle>Cell Detail</DialogTitle>
             <DialogDescription>No data available for this cell.</DialogDescription>
@@ -82,7 +82,7 @@ export default function CellDetailDialog({ open, onOpenAction, nationId, ethnicI
       <DialogContent
         showCloseButton={false}
         overlayClassName="bg-black/30"
-        className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-dvw max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-none bg-black/30 p-0 md:inset-auto md:top-1/2 md:left-1/2 md:h-[calc(100dvh-2rem)] md:w-[min(72rem,calc(100dvw-2rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:bg-black/40"
+        className="fixed inset-0 top-0 left-0 z-50 flex h-dvh w-dvw max-w-none translate-x-0 translate-y-0 flex-col gap-0 rounded-none border-none bg-black/30 p-0 sm:max-w-none md:inset-auto md:top-1/2 md:left-1/2 md:h-[calc(100dvh-2rem)] md:w-[min(72rem,calc(100dvw-2rem))] md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:bg-black/40"
       >
         <DialogTitle className="sr-only">
           {view === 'nation' && nation ? `Nation #${nation.id} details` : 'Ethnic group details'}
