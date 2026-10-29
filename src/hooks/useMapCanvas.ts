@@ -14,6 +14,8 @@ import { setupCanvas } from 'src/services/rendering/canvas/primitives';
 import { computeCellStats } from 'src/services/rendering/canvas/stats';
 import { useLogisticsGameStore } from 'src/store/logisticsGameStore';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
+import { useViewportStore } from 'src/store/viewportStore';
+import { useShallow } from 'zustand/react/shallow';
 
 type TProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -27,7 +29,14 @@ export default function useMapCanvas({ canvasRef }: TProps) {
     startCellId,
     goalCellId,
     routeCellIds,
-  } = useLogisticsGameStore();
+  } = useLogisticsGameStore(
+    useShallow((s) => ({
+      enabled: s.enabled,
+      startCellId: s.startCellId,
+      goalCellId: s.goalCellId,
+      routeCellIds: s.routeCellIds,
+    }))
+  );
   const { mesh, paintVersion } = useMapContext();
   const { cells, width, height, nations, ethnics } = mesh;
   const isIso = displaySettings.isometric;
@@ -120,6 +129,7 @@ export default function useMapCanvas({ canvasRef }: TProps) {
         seaLevel,
       });
     }
+    useViewportStore.getState().bumpRender();
   }, [
     canvasRef,
     cells,

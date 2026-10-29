@@ -31,7 +31,10 @@ export const metadata: Metadata = {
   applicationName: siteMetadata.siteName,
   keywords: siteMetadata.keywords,
   icons: {
-    icon: siteMetadata.icon,
+    icon: [
+      { url: '/icon.svg', type: 'image/svg+xml' },
+      { url: siteMetadata.icon, sizes: 'any' },
+    ],
   },
   openGraph: {
     title: siteMetadata.title,

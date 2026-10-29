@@ -8,25 +8,27 @@
     "build": "next build",
     "analyze": "next experimental-analyze",
     "start": "next start",
+    "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:full": "FANTASY_TEST_PROFILE=full vitest run",
+    "test:e2e": "playwright test",
+    "test:e2e:report": "playwright show-report test-reports/e2e/html",
     "bench:map": "tsx scripts/benchmark-map-generation.ts",
     "format": "prettier --write .",
     "eslint": "eslint --config ./eslint.config.js --cache \"src/**/*.{ts,tsx}\" \"app/**/*.{ts,tsx}\"",
     "prepare": "husky"
   },
   "dependencies": {
-    "@visx/group": "^3.12.0",
-    "@visx/shape": "^3.12.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "d3-delaunay": "^6.0.4",
+    "d3-shape": "^3.2.0",
     "lucide-react": "^1.12.0",
     "next": "16.2.4",
     "radix-ui": "^1.4.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "shadcn": "^4.6.0",
     "tailwind-merge": "^3.5.0",
     "three": "^0.184.0",
     "tw-animate-css": "^1.4.0",
@@ -36,8 +38,10 @@
     "@commitlint/cli": "^19.4.0",
     "@commitlint/config-conventional": "^19.2.2",
     "@eslint/js": "^9.29.0",
+    "@playwright/test": "^1.64.1",
     "@tailwindcss/postcss": "^4",
     "@types/d3-delaunay": "^6.0.4",
+    "@types/d3-shape": "^3.2.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
@@ -50,9 +54,11 @@
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
     "husky": "^9.1.7",
+    "lint-staged": "^17.6.0",
     "postcss": "^8",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.6.14",
+    "shadcn": "^4.23.0",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",
@@ -63,5 +69,18 @@
     "extends": [
       "@commitlint/config-conventional"
     ]
-  }
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --config ./eslint.commit.js --cache --fix",
+      "prettier --write"
+    ],
+    "*.{json,md,css,yml}": [
+      "prettier --write"
+    ]
+  },
+  "engines": {
+    "node": ">=20.9.0"
+  },
+  "packageManager": "npm@11.19.0"
 }

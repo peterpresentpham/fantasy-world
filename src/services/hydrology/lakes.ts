@@ -1,7 +1,7 @@
 import { HYDROLOGY_CONFIG, LAKE_CONFIG } from 'src/configs/map/hydrology';
 import { TFifoQueue } from 'src/services/utils/collections';
 import { collectConnectedComponents, floodFromSeeds } from 'src/services/utils/graph';
-import { TCell } from 'src/types/global';
+import { TBiome, TCell } from 'src/types/global';
 
 const T_COAST_OUTLET = HYDROLOGY_CONFIG.coastOutletId;
 const traversalWorkspace = {};
@@ -175,6 +175,30 @@ function classifyInlandWater(
   }
 }
 
+/** Biome of the surrounding dry land, so a drained lake bed matches its climate. */
+function inheritLandBiome(cells: TCell[], region: number[], fallback: TBiome): Map<number, TBiome> {
+  const inRegion = new Set(region);
+  const result = new Map<number, TBiome>();
+  for (const cellId of region) {
+    const counts = new Map<TBiome, number>();
+    for (const neighborId of cells[cellId].neighbors) {
+      const neighbor = cells[neighborId];
+      if (inRegion.has(neighborId) || neighbor.isWater) continue;
+      counts.set(neighbor.biome, (counts.get(neighbor.biome) ?? 0) + 1);
+    }
+    let best = fallback;
+    let bestCount = 0;
+    for (const [biome, count] of counts) {
+      if (count > bestCount) {
+        best = biome;
+        bestCount = count;
+      }
+    }
+    result.set(cellId, best);
+  }
+  return result;
+}
+
 function filterAndLimitLakes(cells: TCell[], flow: Float32Array) {
   const regions = buildLakeRegions(cells);
   const candidateRegions: number[][] = [];
@@ -193,12 +217,13 @@ function filterAndLimitLakes(cells: TCell[], flow: Float32Array) {
     }
 
     if (touchesSea) {
+      const biomes = inheritLandBiome(cells, region, 'grassland');
       for (const cellId of region) {
         const cell = cells[cellId];
         cell.isLake = false;
         cell.isWater = false;
         cell.landform = 'coast';
-        cell.biome = 'savanna';
+        cell.biome = biomes.get(cellId) ?? 'grassland';
         cell.suitability = 0.6;
       }
       continue;
@@ -222,12 +247,13 @@ function filterAndLimitLakes(cells: TCell[], flow: Float32Array) {
 
   for (const entry of regionScore) {
     if (keptRegions.has(entry.region)) continue;
+    const biomes = inheritLandBiome(cells, entry.region, 'grassland');
     for (const cellId of entry.region) {
       const cell = cells[cellId];
       cell.isLake = false;
       cell.isWater = false;
       cell.landform = 'valley';
-      cell.biome = 'wetland';
+      cell.biome = biomes.get(cellId) ?? 'grassland';
       cell.suitability = 0.52;
     }
   }

@@ -14,6 +14,7 @@ import {
 } from 'src/services/rendering/canvas/primitives';
 import { drawPolygon } from 'src/services/rendering/canvas/shared';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
+import { useUiStore } from 'src/store/uiStore';
 
 type TProps = {
   canvasRef: RefObject<HTMLCanvasElement | null>;
@@ -36,6 +37,31 @@ export default function useMapOverlay({ canvasRef }: TProps) {
   const isoOffsetX = isIso && isoBbox ? -isoBbox.minX : 0;
   const isoOffsetY = isIso && isoBbox ? -isoBbox.minY : 0;
 
+  // Region shown in the side panel, as one Path2D so a hover redraw costs a single fill call.
+  const detailOpen = useUiStore((s) => s.detailOpen);
+  const detailNationId = useUiStore((s) => s.detailNationId);
+  const detailEthnicId = useUiStore((s) => s.detailEthnicId);
+  const selectionPath = useMemo(() => {
+    if (!detailOpen || isIso || typeof Path2D === 'undefined') return null;
+    const matches =
+      detailNationId !== null
+        ? (cell: (typeof cells)[number]) => cell.nationId === detailNationId
+        : detailEthnicId !== null
+          ? (cell: (typeof cells)[number]) => cell.ethnicId === detailEthnicId
+          : null;
+    if (!matches) return null;
+    const path = new Path2D();
+    for (const cell of cells) {
+      if (!matches(cell) || cell.polygon.length === 0) continue;
+      path.moveTo(cell.polygon[0][0], cell.polygon[0][1]);
+      for (let i = 1; i < cell.polygon.length; i += 1) {
+        path.lineTo(cell.polygon[i][0], cell.polygon[i][1]);
+      }
+      path.closePath();
+    }
+    return path;
+  }, [cells, detailEthnicId, detailNationId, detailOpen, isIso]);
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -55,6 +81,11 @@ export default function useMapOverlay({ canvasRef }: TProps) {
       !isIso ? mesh.width : isoCanvasWidth,
       !isIso ? mesh.height : isoCanvasHeight
     );
+
+    if (selectionPath) {
+      context.fillStyle = 'rgba(250, 204, 21, 0.22)';
+      context.fill(selectionPath);
+    }
 
     const hoveredCell = hoverIndex !== null ? cells[hoverIndex] : null;
     if (!hoveredCell) return;
@@ -86,5 +117,6 @@ export default function useMapOverlay({ canvasRef }: TProps) {
     elevScale,
     mesh.width,
     mesh.height,
+    selectionPath,
   ]);
 }

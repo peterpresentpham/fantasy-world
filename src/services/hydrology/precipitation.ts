@@ -7,7 +7,6 @@ type TPrecipitationParams = {
   cells: TCell[];
   height: number;
   seaLevel: number;
-  flow: Float32Array;
   waterInfluence: Float32Array;
   windField: TWindVector[];
 };
@@ -72,7 +71,6 @@ export function computePrecipitation({
   cells,
   height,
   seaLevel,
-  flow,
   waterInfluence,
   windField,
 }: TPrecipitationParams): TPrecipitationOutput {
@@ -147,10 +145,9 @@ export function computePrecipitation({
       );
       const latitudeRain =
         getLatitudeFactor(cell.site[1], height) * PRECIPITATION_CONFIG.baseWeights.latitude;
-      const flowRain = Math.log2(flow[cellIndex] + 1) * PRECIPITATION_CONFIG.baseWeights.flow;
       const baseRain = waterInfluence[cellIndex] * PRECIPITATION_CONFIG.baseWeights.water;
       const totalPrecipitation = clamp(
-        baseRain + latitudeRain + flowRain + elevationRain + mountainRain - rainShadowIndex,
+        baseRain + latitudeRain + elevationRain + mountainRain - rainShadowIndex,
         0,
         1
       );

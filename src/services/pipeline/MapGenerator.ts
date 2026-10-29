@@ -1,6 +1,7 @@
 import {
   TDelaunayMesh,
   TGenerationConfig,
+  TGenerationStage,
   TGenerationStages,
   TTerrainOverride,
 } from 'src/types/global';
@@ -12,16 +13,18 @@ import { buildMesh } from 'src/services/terrain/mesh';
 import { inferBiomeForLandform } from 'src/services/terrain/terrainPainter';
 import { CacheManager } from './CacheManager';
 
-let globalCache: CacheManager | null = null;
+// Reuse state across generations: result/stage cache plus the last built mesh.
+// Callers may pass their own instance (e.g. tests) to avoid sharing it.
+export type TGeneratorState = {
+  cache: CacheManager;
+  lastMesh: { key: string; mesh: TDelaunayMesh } | null;
+};
 
-function getCache(): CacheManager {
-  if (!globalCache) {
-    globalCache = new CacheManager({ maxResults: 5 });
-  }
-  return globalCache;
+export function createGeneratorState(): TGeneratorState {
+  return { cache: new CacheManager({ maxResults: 5 }), lastMesh: null };
 }
 
-let lastMeshResult: { key: string; mesh: TDelaunayMesh } | null = null;
+const defaultState = createGeneratorState();
 
 // Inject elevation overrides into topography cells so hydrology (rivers, climate)
 // computes correctly based on painted terrain.
@@ -62,15 +65,21 @@ function applyLandformOverrides(
 export class MapGenerator {
   private readonly config: TGenerationConfig;
   private readonly forceRefresh: boolean;
+  private readonly state: TGeneratorState;
 
-  constructor(config: TGenerationConfig, forceRefresh = false) {
+  constructor(config: TGenerationConfig, forceRefresh = false, state = defaultState) {
     this.config = config;
     this.forceRefresh = forceRefresh;
+    this.state = state;
   }
 
-  generate(terrainOverrides: Record<number, TTerrainOverride> = {}): TGenerationStages {
+  /** `onStage` fires as each pipeline stage starts, including stages served from the cache. */
+  generate(
+    terrainOverrides: Record<number, TTerrainOverride> = {},
+    onStage?: (stage: TGenerationStage) => void
+  ): TGenerationStages {
     const hasOverrides = Object.keys(terrainOverrides).length > 0;
-    const cache = getCache();
+    const { cache } = this.state;
 
     // Full-result cache only when there are no terrain overrides
     if (!this.forceRefresh && !hasOverrides) {
@@ -91,17 +100,23 @@ export class MapGenerator {
 
     const configKey = [seed, width, height, cellCount].join('|');
 
+    onStage?.('mesh');
     let mesh: TDelaunayMesh;
-    if (!this.forceRefresh && lastMeshResult !== null && lastMeshResult.key === configKey) {
-      mesh = lastMeshResult.mesh;
+    if (
+      !this.forceRefresh &&
+      this.state.lastMesh !== null &&
+      this.state.lastMesh.key === configKey
+    ) {
+      mesh = this.state.lastMesh.mesh;
     } else {
       const newMesh = buildMesh({ width, height, seed, cellCount });
       mesh = newMesh;
-      lastMeshResult = { key: configKey, mesh: newMesh };
+      this.state.lastMesh = { key: configKey, mesh: newMesh };
     }
 
     // Topography only depends on mesh + seaLevel + topography preset, so it
     // can be reused across changes to nationCount/climateControl.
+    onStage?.('topography');
     const cachedTopography =
       !this.forceRefresh && !hasOverrides ? cache.getTopography(this.config) : null;
     let topography: TDelaunayMesh;
@@ -120,6 +135,7 @@ export class MapGenerator {
     // Hydrology + population additionally depend on climateControl, so they
     // can be reused across changes to nationCount alone — the only stage
     // left that varies with it is geopolitics, below.
+    onStage?.('hydrology');
     const cachedPostPopulation =
       !this.forceRefresh && !hasOverrides ? cache.getPostPopulation(this.config) : null;
     let hydrology: TDelaunayMesh;
@@ -135,10 +151,12 @@ export class MapGenerator {
         ? applyLandformOverrides(hydrology, terrainOverrides)
         : hydrology;
 
+      onStage?.('population');
       population = buildPopulation({ mesh: hydrologyForPop, seed });
       if (!hasOverrides) cache.setPostPopulation(this.config, { hydrology, population });
     }
 
+    onStage?.('geopolitics');
     const geopolitics = buildGeopolitics({ mesh: population, seed, nationCount });
 
     const result: TGenerationStages = {

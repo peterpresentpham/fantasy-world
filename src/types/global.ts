@@ -126,7 +126,7 @@ export interface TTopographyCell {
 }
 
 export type TZoneType = 'land' | 'internal-waters' | 'territorial-waters' | 'international-waters';
-export type TRiverEndType = 'sea' | 'offscreen' | 'lake' | 'inland-sink';
+export type TRiverEndType = 'sea' | 'offscreen' | 'lake' | 'inland-sink' | 'confluence';
 export type TRiverKind = 'river' | 'creek' | 'branch' | 'fork';
 
 export type TRiver = {
@@ -134,6 +134,8 @@ export type TRiver = {
   sourceCellId: number;
   mouthCellId: number;
   endType: TRiverEndType;
+  /** Strahler stream order, 1 for headwater streams */
+  order: number;
   parentRiverId: number | null;
   tributaryIds: number[];
   basinId: number;
@@ -205,6 +207,8 @@ export interface TCell {
   isCapital: boolean;
   isEconomicHub: boolean;
 }
+
+export type TGenerationStage = 'mesh' | 'topography' | 'hydrology' | 'population' | 'geopolitics';
 
 export interface TMesh {
   width: number;

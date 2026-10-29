@@ -1,4 +1,9 @@
-import { EROSION_CONFIG, HYDROLOGY_CONFIG, LAKE_CONFIG } from 'src/configs/map/hydrology';
+import {
+  EROSION_CONFIG,
+  HYDROLOGY_CONFIG,
+  LAKE_CONFIG,
+  RIVER_CONFIG,
+} from 'src/configs/map/hydrology';
 import { TCell, TDelaunayMesh, THydrologyParams, TTerrain } from 'src/types/global';
 import {
   buildWaterInfluence,
@@ -126,7 +131,8 @@ function runHydrologyInternal({
       deposit[downstreamId] += erosionAmount * EROSION_CONFIG.depositRate;
     }
 
-    if (isSink && flow[cellIndex] > LAKE_CONFIG.sinkFlowMin) {
+    const isLowEnough = cell.elevation - seaLevel <= LAKE_CONFIG.maxSeedElevationAboveSea;
+    if (isSink && isLowEnough && flow[cellIndex] > LAKE_CONFIG.sinkFlowMin) {
       isLake[cellIndex] = 1;
     }
   }
@@ -177,6 +183,16 @@ function runHydrologyInternal({
   });
   const neighborsByCell = cells.map((cell) => cell.neighbors);
 
+  // Rivers are traced after biomes, so approximate them with the drainage network for now.
+  const earlyRiverCatchment =
+    RIVER_CONFIG.earlyMaskCatchment *
+    Math.pow(cellCount / 10000, RIVER_CONFIG.cellsNumberModifierExp);
+  for (let cellIndex = 0; cellIndex < cellCount; cellIndex += 1) {
+    const cell = cells[cellIndex];
+    isRiver[cellIndex] =
+      !cell.isWater && isLake[cellIndex] === 0 && flow[cellIndex] >= earlyRiverCatchment ? 1 : 0;
+  }
+
   const waterInfluence = buildWaterInfluence(cells);
   const reliefByCell = new Float32Array(cells.length);
   const windField = buildWindField(cells, mesh.height, seed);
@@ -184,7 +200,6 @@ function runHydrologyInternal({
     cells,
     height: mesh.height,
     seaLevel,
-    flow,
     waterInfluence,
     windField,
   });
@@ -359,10 +374,12 @@ function runHydrologyInternal({
     riverSource.add(river.sourceCellId);
     riverMouth.add(river.mouthCellId);
   }
+  const orderByRiver = new Map(result.rivers.map((river) => [river.id, river.order]));
   for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
-    cells[cellIndex].isRiverSource = riverSource.has(cellIndex);
-    cells[cellIndex].isRiverMouth = riverMouth.has(cellIndex);
-    cells[cellIndex].riverOrder = cells[cellIndex].isRiver ? 1 : 0;
+    const cell = cells[cellIndex];
+    cell.isRiverSource = riverSource.has(cellIndex);
+    cell.isRiverMouth = riverMouth.has(cellIndex);
+    cell.riverOrder = cell.riverId !== null ? (orderByRiver.get(cell.riverId) ?? 1) : 0;
   }
 
   mesh.rivers = result.rivers;

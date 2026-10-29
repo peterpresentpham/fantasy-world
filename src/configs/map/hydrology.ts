@@ -12,6 +12,8 @@ export const EROSION_CONFIG = {
 
 export const LAKE_CONFIG = {
   sinkFlowMin: 8.8,
+  /** Highest a lake basin may sit above sea level; higher pits drain as streams instead. */
+  maxSeedElevationAboveSea: 0.3,
   expansion: { maxCells: 5, elevationSlack: 0.018, rainShadowMax: 0.34, precipMin: 0.28 },
   limits: { maxCount: 12 },
   enclosedWater: {
@@ -25,7 +27,7 @@ export const LAKE_CONFIG = {
 };
 
 export const PRECIPITATION_CONFIG = {
-  baseWeights: { water: 0.56, latitude: 1.0, flow: 0.08 },
+  baseWeights: { water: 0.56, latitude: 1.0 },
   orographicSimple: { elevationStart: 0.6, weight: 0.25, maxBonus: 0.25 },
   wind: {
     tradeLatMax: 0.23,
@@ -56,8 +58,10 @@ export const PRECIPITATION_CONFIG = {
 export const RIVER_CONFIG = {
   minFluxToFormRiver: 80,
   landWaterThreshold: 0.2,
+  /** Upstream cells needed before a cell counts as a river for biome classification (rivers are traced later). */
+  earlyMaskCatchment: 10,
   cellsNumberModifierExp: 0.25,
-  depression: { maxIterations: 200, epsilon: 0.0001, coastLift: 0.0015 },
+  depression: { epsilon: 0.0001, coastLift: 0.0015 },
   width: { fluxFactor: 500, maxFluxWidth: 1, lengthFactor: 200, minWidth: 0.8, maxWidth: 4.8 },
   meander: { base: 0.5, minSegmentLength: 16 },
   minRiverCells: 6,

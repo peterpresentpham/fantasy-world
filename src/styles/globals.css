@@ -21,6 +21,8 @@
   --border: oklch(0.3 0.025 50);
   --input: oklch(0.28 0.02 50);
   --ring: oklch(0.5 0.13 62);
+  --success: oklch(0.78 0.14 155);
+  --info: oklch(0.82 0.1 230);
   --chart-1: oklch(0.6 0.15 48);
   --chart-2: oklch(0.55 0.12 140);
   --chart-3: oklch(0.5 0.14 200);
@@ -62,6 +64,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-info: var(--info);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);

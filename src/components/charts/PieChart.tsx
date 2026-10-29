@@ -1,10 +1,11 @@
 'use client';
 
-import { Group } from '@visx/group';
-import { Pie } from '@visx/shape';
-import { type ReactNode, useMemo, useRef, useState } from 'react';
+import { arc as d3Arc, pie as d3Pie } from 'd3-shape';
+import { type ReactNode, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { TBaseChartData, TPieChartData } from 'src/types/global';
+
+const INNER_RADIUS_RATIO = 0.55;
 
 type TPieTooltipData<T extends TPieChartData> = {
   datum: T;
@@ -20,7 +21,6 @@ type TProps<T extends TPieChartData> = TBaseChartData & {
 
 export default function PieChart<T extends TPieChartData>(params: TProps<T>) {
   const { data, width = 300, height = 300, renderTooltip } = params;
-  const containerRef = useRef<HTMLDivElement | null>(null);
   const radius = width / 2;
 
   const [tooltip, setTooltip] = useState<{
@@ -30,52 +30,51 @@ export default function PieChart<T extends TPieChartData>(params: TProps<T>) {
   } | null>(null);
 
   const total = useMemo(() => data.reduce((sum, item) => sum + item.value, 0), [data]);
+  const arcs = useMemo(
+    () =>
+      d3Pie<T>()
+        .value((d) => d.value)
+        .padAngle(0.02)(data),
+    [data]
+  );
+  const arcPath = useMemo(
+    () =>
+      d3Arc<(typeof arcs)[number]>()
+        .outerRadius(radius)
+        .innerRadius(radius * INNER_RADIUS_RATIO),
+    [radius]
+  );
 
   return (
-    <div ref={containerRef} className="relative w-fit">
-      <svg width={width} height={height}>
-        <Group top={height / 2} left={width / 2}>
-          <Pie
-            data={data}
-            pieValue={(d) => d.value}
-            outerRadius={radius}
-            innerRadius={radius - 80}
-            padAngle={0.02}
-          >
-            {(pie) =>
-              pie.arcs.map((arc) => {
-                const percent = ((arc.data.value / total) * 100).toFixed(1);
+    <div className="relative w-full" style={{ maxWidth: width }}>
+      <svg viewBox={`0 0 ${width} ${height}`} className="block h-auto w-full">
+        <g transform={`translate(${width / 2},${height / 2})`}>
+          {arcs.map((arc) => {
+            const percent = ((arc.data.value / total) * 100).toFixed(1);
 
-                return (
-                  <g key={arc.data.label}>
-                    <path
-                      d={pie.path(arc) || ''}
-                      fill={arc.data.color}
-                      className="cursor-pointer transition-opacity hover:opacity-80"
-                      onMouseMove={(e) => {
-                        const rect = containerRef.current?.getBoundingClientRect();
-
-                        if (!rect) return;
-
-                        setTooltip({
-                          x: e.clientX,
-                          y: e.clientY,
-                          data: {
-                            datum: arc.data,
-                            label: arc.data.label,
-                            value: arc.data.value,
-                            percent,
-                          },
-                        });
-                      }}
-                      onMouseLeave={() => setTooltip(null)}
-                    />
-                  </g>
-                );
-              })
-            }
-          </Pie>
-        </Group>
+            return (
+              <path
+                key={arc.data.label}
+                d={arcPath(arc) || ''}
+                fill={arc.data.color}
+                className="cursor-pointer transition-opacity hover:opacity-80"
+                onMouseMove={(e) =>
+                  setTooltip({
+                    x: e.clientX,
+                    y: e.clientY,
+                    data: {
+                      datum: arc.data,
+                      label: arc.data.label,
+                      value: arc.data.value,
+                      percent,
+                    },
+                  })
+                }
+                onMouseLeave={() => setTooltip(null)}
+              />
+            );
+          })}
+        </g>
       </svg>
       {tooltip &&
         createPortal(

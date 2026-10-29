@@ -11,7 +11,10 @@ export default function BlurCard({ title, titleComponent, containerProps, ...pro
   return (
     <section {...props} className={cn('fantasy-glass min-w-0 rounded-lg p-3', props.className)}>
       <div className="flex items-center justify-between">
-        <h4 className="fantasy-text-muted text-xs font-semibold tracking-wide uppercase">
+        <h4
+          className="fantasy-text-muted min-w-0 truncate text-xs font-semibold tracking-wide uppercase"
+          title={title}
+        >
           {title}
         </h4>
         {titleComponent}

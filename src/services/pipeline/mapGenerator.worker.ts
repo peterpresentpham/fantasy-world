@@ -29,7 +29,10 @@ ctx.onmessage = (event: MessageEvent<TWorkerRequest>) => {
 
   try {
     const generator = new MapGenerator(config);
-    const stages = generator.generate(terrainOverrides);
+    const stages = generator.generate(terrainOverrides, (progress) => {
+      const message: TWorkerResponse = { requestId, progress };
+      ctx.postMessage(message);
+    });
     const response: TWorkerResponse = { requestId, ok: true, stages: toWireStages(stages) };
     ctx.postMessage(response);
   } catch (error) {

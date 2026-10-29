@@ -17,7 +17,7 @@ export default function ChartTagList({ items, formatValue }: TProps) {
       {items.map((item) => (
         <span
           key={item.label}
-          className="inline-flex items-center gap-1 rounded border border-white/10 bg-slate-900/45 px-2 py-0.5 text-[11px] text-slate-200"
+          className="border-border bg-muted/60 text-foreground inline-flex items-center gap-1 rounded border px-2 py-0.5 text-[11px]"
         >
           <span
             className="inline-block size-2 rounded-full"
@@ -25,7 +25,7 @@ export default function ChartTagList({ items, formatValue }: TProps) {
           />
           <span>{item.label}</span>
           {formatValue && item.value !== undefined && (
-            <span className="ml-1 font-medium text-slate-100 tabular-nums">
+            <span className="text-foreground ml-1 font-medium tabular-nums">
               {formatValue(item.value)}
             </span>
           )}

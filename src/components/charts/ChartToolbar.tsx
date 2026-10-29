@@ -37,7 +37,7 @@ export default function ChartToolbar<TKey extends string>({
         size="xs"
         variant="ghost"
         onClick={onToggleData}
-        className={showData ? 'text-sky-300' : ''}
+        className={showData ? 'text-info' : ''}
       >
         {showData ? <Table2Icon className="size-3.5" /> : <ListIcon className="size-3.5" />}
       </Button>

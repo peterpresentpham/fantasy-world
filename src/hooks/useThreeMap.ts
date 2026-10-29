@@ -125,10 +125,12 @@ export default function useThreeMap() {
       camera.updateProjectionMatrix();
       renderer.setSize(w, h);
     }
-    window.addEventListener('resize', onResize);
+    // observe the container (not the window): it also changes when the side panel opens
+    const resizeObserver = new ResizeObserver(onResize);
+    resizeObserver.observe(containerEl);
 
     cleanupRef.current = () => {
-      window.removeEventListener('resize', onResize);
+      resizeObserver.disconnect();
       cancelAnimationFrame(animId);
       renderer.dispose();
       mergedGeometry?.dispose();

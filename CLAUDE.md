@@ -132,3 +132,11 @@ The development process is structured into sequential phases. Each layer builds 
 7. `src/contexts/` — React Context providers
 8. `src/hooks/` — Shared React hooks
 9. `src/types/` — **Canonical directory for all shared Type/Interface definitions**
+
+# Testing Rules
+
+- **Never run tests on your own.** This covers `npm test`, `npm run test:full`, `npm run test:e2e`, `vitest`, `playwright test` and `npm run bench:map`, including running a single file or a single case. To run any of them, ask the user first and get their confirmation, every time. Approval for one run does not carry over to the next.
+- Static checks are fine to run without asking: `npm run typecheck`, `npm run eslint`, `prettier --check`, `npm run build`.
+- Once the user has approved a run: after changing generation code, run `npm test`, and `npm run test:full` for large changes; after changing UI, run `npm run test:e2e`.
+- Write or update tests freely, but do not execute them.
+- Reports are written to `test-reports/` (gitignored).

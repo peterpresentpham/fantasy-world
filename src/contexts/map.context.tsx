@@ -16,7 +16,9 @@ import { generateInWorker } from 'src/services/pipeline/generationClient';
 import { parseSnapshot } from 'src/services/pipeline/snapshot';
 import { paintCellTerrain } from 'src/services/terrain/paint';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
+import { useGenerationStore } from 'src/store/generationStore';
 import { useTerrainEditorStore } from 'src/store/terrainEditorStore';
+import { useShallow } from 'zustand/react/shallow';
 import { TDelaunayMesh, TExportSnapshot, TLandform, TTerrainOverride } from 'src/types/global';
 
 interface TMapContextType {
@@ -85,10 +87,28 @@ export default function MapProvider({ children }: TProps) {
     climateControl,
     setCellCount,
     setHoverIndex,
-  } = useMapExplorerStore();
+  } = useMapExplorerStore(
+    useShallow((s) => ({
+      seed: s.seed,
+      cellCount: s.cellCount,
+      seaLevel: s.seaLevel,
+      topography: s.topography,
+      nationCount: s.nationCount,
+      climateControl: s.climateControl,
+      setCellCount: s.setCellCount,
+      setHoverIndex: s.setHoverIndex,
+    }))
+  );
 
-  const { lockOverrides, clearLockedOverrides, lockedOverrides } = useTerrainEditorStore();
+  const { lockOverrides, clearLockedOverrides, lockedOverrides } = useTerrainEditorStore(
+    useShallow((s) => ({
+      lockOverrides: s.lockOverrides,
+      clearLockedOverrides: s.clearLockedOverrides,
+      lockedOverrides: s.lockedOverrides,
+    }))
+  );
 
+  const setStage = useGenerationStore((s) => s.setStage);
   const [mesh, setMesh] = useState(mapContextDefault.mesh);
   const [isGenerating, setIsGenerating] = useState(true);
 
@@ -110,6 +130,7 @@ export default function MapProvider({ children }: TProps) {
     generationIdRef.current += 1;
     const generationId = generationIdRef.current;
     setIsGenerating(true);
+    setStage('mesh');
 
     // Read locked overrides at generation time (not from closure)
     const lockedOverrides = useTerrainEditorStore.getState().lockedOverrides;
@@ -125,7 +146,10 @@ export default function MapProvider({ children }: TProps) {
         nationCount,
         climateControl,
       },
-      lockedOverrides
+      lockedOverrides,
+      (stage) => {
+        if (generationId === generationIdRef.current) setStage(stage);
+      }
     )
       .then(({ geopolitics }) => {
         if (generationId !== generationIdRef.current) return;
@@ -143,7 +167,16 @@ export default function MapProvider({ children }: TProps) {
         console.error('Map generation failed', error);
         setIsGenerating(false);
       });
-  }, [cellCount, climateControl, nationCount, seaLevel, seed, topography, generationNonce]);
+  }, [
+    cellCount,
+    climateControl,
+    nationCount,
+    seaLevel,
+    seed,
+    setStage,
+    topography,
+    generationNonce,
+  ]);
 
   const handleCellCountChange = useCallback(
     (nextValue: number) => {

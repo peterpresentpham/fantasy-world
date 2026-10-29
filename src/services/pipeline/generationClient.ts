@@ -4,6 +4,7 @@ import { Delaunay } from 'd3-delaunay';
 import {
   TDelaunayMesh,
   TGenerationConfig,
+  TGenerationStage,
   TGenerationStages,
   TMesh,
   TTerrainOverride,
@@ -14,7 +15,11 @@ let worker: Worker | null = null;
 let nextRequestId = 0;
 const pending = new Map<
   number,
-  { resolve: (stages: TGenerationStages) => void; reject: (error: Error) => void }
+  {
+    resolve: (stages: TGenerationStages) => void;
+    reject: (error: Error) => void;
+    onProgress?: (stage: TGenerationStage) => void;
+  }
 >();
 
 function attachDelaunay(mesh: TMesh, delaunay: Delaunay<[number, number]>): TDelaunayMesh {
@@ -44,6 +49,10 @@ function getWorker(): Worker {
     const response = event.data;
     const entry = pending.get(response.requestId);
     if (!entry) return;
+    if ('progress' in response) {
+      entry.onProgress?.(response.progress);
+      return;
+    }
     pending.delete(response.requestId);
 
     if (!response.ok) {
@@ -69,12 +78,13 @@ function getWorker(): Worker {
  */
 export function generateInWorker(
   config: TGenerationConfig,
-  terrainOverrides: Record<number, TTerrainOverride> = {}
+  terrainOverrides: Record<number, TTerrainOverride> = {},
+  onProgress?: (stage: TGenerationStage) => void
 ): Promise<TGenerationStages> {
   return new Promise((resolve, reject) => {
     const requestId = nextRequestId;
     nextRequestId += 1;
-    pending.set(requestId, { resolve, reject });
+    pending.set(requestId, { resolve, reject, onProgress });
 
     const request: TWorkerRequest = { requestId, config, terrainOverrides };
     getWorker().postMessage(request);

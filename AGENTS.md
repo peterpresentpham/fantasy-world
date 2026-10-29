@@ -118,6 +118,12 @@ The file is **atomic** (self-contained with a single clear responsibility) and f
 4. **Population** – Population & economy distribution
 5. **Geopolitics** – Nations, provinces, ethnic regions, capitals, economic hubs
 
+## Testing Rules
+
+- **Never run tests on your own** (`npm test`, `npm run test:full`, `npm run test:e2e`, `vitest`, `playwright test`, `npm run bench:map`, including a single file or case). Ask the user and get confirmation first, every time; one approval does not carry over.
+- Static checks (`npm run typecheck`, `npm run eslint`, `prettier --check`, `npm run build`) may run without asking.
+- Writing or updating tests is fine; executing them is not, without approval.
+
 ---
 
 **Follow these rules strictly.** They exist to keep the codebase clean, maintainable, and scalable.

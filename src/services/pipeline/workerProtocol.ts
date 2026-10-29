@@ -1,4 +1,4 @@
-import { TGenerationConfig, TMesh, TTerrainOverride } from 'src/types/global';
+import { TGenerationConfig, TGenerationStage, TMesh, TTerrainOverride } from 'src/types/global';
 
 export type TWireStages = {
   mesh: TMesh;
@@ -15,5 +15,6 @@ export type TWorkerRequest = {
 };
 
 export type TWorkerResponse =
+  | { requestId: number; progress: TGenerationStage }
   | { requestId: number; ok: true; stages: TWireStages }
   | { requestId: number; ok: false; error: string };

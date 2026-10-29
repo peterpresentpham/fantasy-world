@@ -1,2 +1,2 @@
-bun run build
-bunx eslint --config ./eslint.commit.js --cache
+npx lint-staged
+npm run typecheck

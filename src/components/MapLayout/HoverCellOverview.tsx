@@ -2,134 +2,152 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useMapContext } from 'src/contexts/map.context';
-import { clamp } from 'src/services/utils/math';
 import { describeCell } from 'src/services/rendering/descriptors/describeCell';
+import { clamp } from 'src/services/utils/math';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
 
-const PANEL_OFFSET = 14;
+const PANEL_OFFSET = 16;
 const PANEL_PADDING = 10;
-const PANEL_ESTIMATED_WIDTH = 280;
-const PANEL_ESTIMATED_HEIGHT = 300;
+const PANEL_WIDTH = 288;
+const COMPACT_HEIGHT = 120;
+const FULL_HEIGHT = 300;
 const TOOLTIP_DELAY_MS = 300;
 
-type TGroupedRow = { label: string; value: string; accent?: boolean };
+type TRow = { label: string; value: string; accent?: boolean };
 
 export default function HoverCellOverview() {
   const hoverIndex = useMapExplorerStore((s) => s.hoverIndex);
+  const point = useMapExplorerStore((s) => s.hoverClientPoint);
   const cellDataEnabled = useMapExplorerStore((s) => s.displaySettings.cellData);
   const { mesh, paintVersion } = useMapContext();
-  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [delayedHoverIndex, setDelayedHoverIndex] = useState<number | null>(null);
-  const [canvasRect, setCanvasRect] = useState<DOMRect | null>(null);
+  const [viewport, setViewport] = useState({ width: 0, height: 0 });
+  const [delayedIndex, setDelayedIndex] = useState<number | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
-    function handleResize() {
-      setViewportSize({ width: window.innerWidth, height: window.innerHeight });
-      const canvas = document.getElementById('map-base-canvas');
-      if (!(canvas instanceof HTMLCanvasElement)) return;
-      setCanvasRect(canvas.getBoundingClientRect());
-    }
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    const onResize = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === 'Shift') setExpanded(event.type === 'keydown');
+    };
+    const collapse = () => setExpanded(false);
+    onResize();
+    window.addEventListener('resize', onResize);
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('keyup', onKey);
+    window.addEventListener('blur', collapse);
+    return () => {
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('keyup', onKey);
+      window.removeEventListener('blur', collapse);
+    };
   }, []);
 
   useEffect(() => {
     if (hoverIndex === null) {
-      setDelayedHoverIndex(null);
+      setDelayedIndex(null);
       return;
     }
-    const timer = window.setTimeout(() => {
-      setDelayedHoverIndex(hoverIndex);
-    }, TOOLTIP_DELAY_MS);
+    const timer = window.setTimeout(() => setDelayedIndex(hoverIndex), TOOLTIP_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [hoverIndex]);
 
-  useEffect(() => {
-    const canvas = document.getElementById('map-base-canvas');
-    if (!(canvas instanceof HTMLCanvasElement)) return;
-    setCanvasRect(canvas.getBoundingClientRect());
-  }, [mesh.width, mesh.height]);
-
   const { cell, description } = useMemo(() => {
-    const nextCell = delayedHoverIndex !== null ? mesh.cells[delayedHoverIndex] : null;
-    if (nextCell) return { cell: nextCell, description: describeCell(nextCell) };
+    const next = delayedIndex !== null ? mesh.cells[delayedIndex] : null;
+    if (next) return { cell: next, description: describeCell(next) };
     return { cell: undefined, description: undefined };
+    // `paintVersion`: cells are mutated in place while painting, so re-describe on each stroke.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [delayedHoverIndex, mesh, paintVersion]);
+  }, [delayedIndex, mesh, paintVersion]);
 
-  const rows = useMemo<TGroupedRow[]>(() => {
-    if (!description) return [];
-    return [
-      { label: 'Terrain', value: description.terrainType, accent: true },
-      { label: 'Elevation', value: description.elevation },
-      { label: 'Biome', value: description.biome, accent: true },
-      { label: 'Temp', value: description.temperature },
-      { label: 'Precip', value: description.precipitation },
-      { label: 'Rain Shadow', value: description.rainShadow },
-      { label: 'River', value: description.riverState },
-      { label: 'Flow', value: description.flow },
-      { label: 'Suitability', value: description.suitability },
-      { label: 'Population', value: description.population, accent: true },
-      { label: 'Nation', value: description.nationId },
-      { label: 'Province', value: description.provinceId },
-      { label: 'Ethnic', value: description.ethnicId },
-      { label: 'Zone', value: description.zoneType },
-    ];
-  }, [description]);
+  const compactRows = useMemo<TRow[]>(
+    () =>
+      description
+        ? [
+            { label: 'Terrain', value: description.terrainType, accent: true },
+            { label: 'Biome', value: description.biome, accent: true },
+            { label: 'Nation', value: description.nationId },
+            { label: 'Population', value: description.population, accent: true },
+          ]
+        : [],
+    [description]
+  );
 
-  const positionStyle = useMemo(() => {
-    if (!cell || !canvasRect) return { left: PANEL_PADDING, top: PANEL_PADDING };
+  const extraRows = useMemo<TRow[]>(
+    () =>
+      description
+        ? [
+            { label: 'Elevation', value: description.elevation },
+            { label: 'Temp', value: description.temperature },
+            { label: 'Precip', value: description.precipitation },
+            { label: 'Rain Shadow', value: description.rainShadow },
+            { label: 'River', value: description.riverState },
+            { label: 'Flow', value: description.flow },
+            { label: 'Suitability', value: description.suitability },
+            { label: 'Province', value: description.provinceId },
+            { label: 'Ethnic', value: description.ethnicId },
+            { label: 'Zone', value: description.zoneType },
+          ]
+        : [],
+    [description]
+  );
 
-    const scaleX = canvasRect.width / Math.max(1, mesh.width);
-    const scaleY = canvasRect.height / Math.max(1, mesh.height);
-    const anchorX = canvasRect.left + cell.site[0] * scaleX;
-    const anchorY = canvasRect.top + cell.site[1] * scaleY;
+  const summary =
+    description && cell
+      ? `Cell ${cell.id}: ${description.terrainType}, ${description.biome}, ${description.nationId}`
+      : 'Hover over the map to inspect a cell.';
 
-    const flipX =
-      anchorX + PANEL_OFFSET + PANEL_ESTIMATED_WIDTH > viewportSize.width - PANEL_PADDING;
-    const flipY =
-      anchorY + PANEL_OFFSET + PANEL_ESTIMATED_HEIGHT > viewportSize.height - PANEL_PADDING;
-
-    const rawLeft = flipX ? anchorX - PANEL_ESTIMATED_WIDTH - PANEL_OFFSET : anchorX + PANEL_OFFSET;
-    const rawTop = flipY ? anchorY - PANEL_ESTIMATED_HEIGHT - PANEL_OFFSET : anchorY + PANEL_OFFSET;
-
+  const height = expanded ? FULL_HEIGHT : COMPACT_HEIGHT;
+  const style = useMemo(() => {
+    if (!point) return null;
+    const flipX = point.x + PANEL_OFFSET + PANEL_WIDTH > viewport.width - PANEL_PADDING;
+    const flipY = point.y + PANEL_OFFSET + height > viewport.height - PANEL_PADDING;
+    const left = flipX ? point.x - PANEL_WIDTH - PANEL_OFFSET : point.x + PANEL_OFFSET;
+    const top = flipY ? point.y - height - PANEL_OFFSET : point.y + PANEL_OFFSET;
     return {
       left: clamp(
-        rawLeft,
+        left,
         PANEL_PADDING,
-        viewportSize.width - PANEL_ESTIMATED_WIDTH - PANEL_PADDING
+        Math.max(PANEL_PADDING, viewport.width - PANEL_WIDTH - PANEL_PADDING)
       ),
       top: clamp(
-        rawTop,
+        top,
         PANEL_PADDING,
-        viewportSize.height - PANEL_ESTIMATED_HEIGHT - PANEL_PADDING
+        Math.max(PANEL_PADDING, viewport.height - height - PANEL_PADDING)
       ),
     };
-  }, [canvasRect, cell, mesh.width, mesh.height, viewportSize]);
-
-  if (!cellDataEnabled || !description || !cell) return null;
+  }, [point, viewport, height]);
 
   return (
-    <div className="pointer-events-none fixed z-1000000" style={positionStyle}>
-      <div className="fantasy-glass-strong w-72 rounded-xl p-3 pb-2.5 shadow-2xl">
-        <p className="fantasy-text-muted mb-2 text-xs font-bold tracking-wider uppercase">
-          CELL #{cell.id}
-        </p>
-        <div className="flex flex-wrap gap-x-3 gap-y-1">
-          {rows.map((row) => (
-            <span
-              key={row.label}
-              className="inline-flex items-baseline gap-1 text-xs leading-tight"
-            >
-              <span className="fantasy-text-muted">{row.label}</span>
-              <span className={row.accent ? 'fantasy-text-gold font-semibold' : 'font-medium'}>
-                {row.value}
-              </span>
-            </span>
-          ))}
+    <>
+      <p id="map-hover-description" className="sr-only" aria-live="polite">
+        {summary}
+      </p>
+      {cellDataEnabled && cell && style && (
+        <div className="pointer-events-none fixed z-1000000" style={style}>
+          <div className="fantasy-glass-strong w-72 rounded-xl p-3 pb-2.5 shadow-2xl">
+            <p className="fantasy-text-muted mb-2 text-xs font-bold tracking-wider uppercase">
+              CELL #{cell.id}
+            </p>
+            <div className="flex flex-wrap gap-x-3 gap-y-1">
+              {(expanded ? [...compactRows, ...extraRows] : compactRows).map((row) => (
+                <span
+                  key={row.label}
+                  className="inline-flex items-baseline gap-1 text-xs leading-tight"
+                >
+                  <span className="fantasy-text-muted">{row.label}</span>
+                  <span className={row.accent ? 'fantasy-text-gold font-semibold' : 'font-medium'}>
+                    {row.value}
+                  </span>
+                </span>
+              ))}
+            </div>
+            {!expanded && (
+              <p className="fantasy-text-muted mt-2 text-[10px]">Hold Shift for details</p>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
+      )}
+    </>
   );
 }

@@ -74,7 +74,7 @@ export default function TerrainStatistic({ data, title = 'Terrain' }: TProps) {
         {pieData.map((item) => (
           <div
             key={`terrain-legend-${item.type}`}
-            className="inline-flex items-center gap-1 rounded border border-white/10 bg-slate-900/45 px-2 py-1 text-[11px] text-slate-200"
+            className="border-border bg-muted/60 text-foreground inline-flex items-center gap-1 rounded border px-2 py-1 text-[11px]"
           >
             <span
               className="inline-block size-2 rounded-full"
