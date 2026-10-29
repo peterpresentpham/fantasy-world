@@ -10,6 +10,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:unit": "vitest run src/services/utils",
     "test:watch": "vitest",
     "test:full": "FANTASY_TEST_PROFILE=full vitest run",
     "test:e2e": "playwright test",

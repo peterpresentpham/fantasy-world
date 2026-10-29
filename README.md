@@ -28,7 +28,8 @@ npm run build      # production build
 npm run start      # serve the production build
 npm run typecheck  # tsc --noEmit
 npm run eslint     # lint
-npm run test       # unit + invariant tests (vitest)
+npm run test:unit  # simple unit tests (this is all CI runs)
+npm run test       # all vitest tests, including map-generation checks
 npm run test:e2e   # browser tests (first: npx playwright install chromium)
 ```
 

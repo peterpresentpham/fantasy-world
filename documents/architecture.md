@@ -73,4 +73,5 @@ Use `useShallow` or single-field selectors. Persisted stores bump `version` and 
 
 - `vitest`: unit tests next to the code, plus `pipelineInvariants.test.ts` (properties every generated world must satisfy; `FANTASY_TEST_PROFILE=full` sweeps seeds and presets) and `pipeline/stages.test.ts`.
 - `playwright` (`e2e/`): runs against a production build, desktop and mobile projects.
+- CI (`.github/workflows/ci.yml`) runs only `npm run test:unit` (the pure unit tests under `src/services/utils`). Typecheck, lint, build, generation snapshots and e2e are run locally.
 - Per the project rules, tests are run only after the maintainer agrees.

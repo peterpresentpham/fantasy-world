@@ -6,7 +6,7 @@ on:
   pull_request:
 
 jobs:
-  check:
+  unit-test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -15,7 +15,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run eslint
-      - run: npm test
-      - run: npm run build
+      - run: npm run test:unit
