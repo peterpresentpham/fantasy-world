@@ -39,6 +39,43 @@
   --sidebar-ring: oklch(0.5 0.13 62);
 }
 
+/* Parchment: a light, warm-paper version of the same tokens. */
+:root[data-theme='parchment'] {
+  color-scheme: light;
+  --background: oklch(0.9 0.04 82);
+  --foreground: oklch(0.25 0.04 55);
+  --card: oklch(0.94 0.035 84);
+  --card-foreground: oklch(0.27 0.04 55);
+  --popover: oklch(0.95 0.03 84);
+  --popover-foreground: oklch(0.27 0.04 55);
+  --primary: oklch(0.45 0.1 55);
+  --primary-foreground: oklch(0.96 0.02 84);
+  --secondary: oklch(0.86 0.05 80);
+  --secondary-foreground: oklch(0.27 0.04 55);
+  --muted: oklch(0.88 0.04 82);
+  --muted-foreground: oklch(0.42 0.05 58);
+  --accent: oklch(0.5 0.14 50);
+  --accent-foreground: oklch(0.98 0.01 84);
+  --destructive: oklch(0.5 0.2 25);
+  --border: oklch(0.72 0.06 75);
+  --input: oklch(0.76 0.05 75);
+  --ring: oklch(0.5 0.12 55);
+  --success: oklch(0.42 0.12 155);
+  --info: oklch(0.42 0.1 235);
+  --sidebar: oklch(0.94 0.035 84);
+  --sidebar-foreground: oklch(0.27 0.04 55);
+  --sidebar-primary: oklch(0.45 0.1 55);
+  --sidebar-primary-foreground: oklch(0.96 0.02 84);
+  --sidebar-accent: oklch(0.86 0.05 80);
+  --sidebar-accent-foreground: oklch(0.27 0.04 55);
+  --sidebar-border: oklch(0.72 0.06 75);
+  --sidebar-ring: oklch(0.5 0.12 55);
+}
+
+:root[data-theme='parchment'] * {
+  scrollbar-color: rgba(120, 90, 50, 0.5) rgba(120, 90, 50, 0.12);
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

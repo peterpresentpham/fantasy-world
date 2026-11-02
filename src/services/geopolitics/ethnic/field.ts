@@ -11,11 +11,9 @@ export function getEthnicGroupCount(
   nationCount: number,
   config: TEthnicConfig
 ) {
-  const byLand = Math.floor(landCellCount / 1300);
-  return Math.max(
-    config.majorGroupMin,
-    Math.min(config.majorGroupMax, Math.max(nationCount, byLand))
-  );
+  const byLand = Math.round(landCellCount / config.cellsPerGroup);
+  const byNations = Math.ceil(nationCount * config.groupsPerNation);
+  return Math.max(1, Math.min(config.majorGroupMax, Math.max(byLand, byNations)));
 }
 
 export function collectLandComponents(cells: TCell[]) {
@@ -68,7 +66,6 @@ export function pickEthnicCoreSeeds(
 
 export function buildEthnicField(
   cells: TCell[],
-  owner: Int32Array,
   seedCells: number[],
   seed: string,
   config: TEthnicConfig,
@@ -100,13 +97,6 @@ export function buildEthnicField(
         if (!allowedCells.has(neighborId) || !isLand(neighbor)) continue;
 
         let step = Cost.ethnic(neighbor, { strength: config.terrainInfluenceStrength });
-        const borderPenalty =
-          owner[current.cellId] >= 0 &&
-          owner[neighborId] >= 0 &&
-          owner[current.cellId] !== owner[neighborId]
-            ? 1 - config.crossBorderBlend
-            : 0;
-        step += borderPenalty;
         if (cells[current.cellId].landform === 'mountain' && neighbor.landform === 'mountain') {
           step += config.fragmentationLevel * 0.35;
         }

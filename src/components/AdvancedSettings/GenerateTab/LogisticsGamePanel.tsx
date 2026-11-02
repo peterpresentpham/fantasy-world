@@ -1,12 +1,9 @@
-import { useEffect } from 'react';
 import BlurCard from 'src/components/BlurCard';
 import { Button } from 'src/components/ui/button';
 import { Input } from 'src/components/ui/input';
-import { useMapContext } from 'src/contexts/map.context';
 import { useLogisticsGameStore } from 'src/store/logisticsGameStore';
 
 export default function LogisticsGamePanel() {
-  const { mesh } = useMapContext();
   const {
     enabled,
     startCellId,
@@ -18,16 +15,10 @@ export default function LogisticsGamePanel() {
     routeScore,
     routeTotalCost,
     setEnabled,
-    recalculateRoute,
     buildRoadOnCurrentRoute,
     resetRouteSelection,
     resetGame,
   } = useLogisticsGameStore();
-
-  useEffect(() => {
-    if (!enabled) return;
-    recalculateRoute(mesh);
-  }, [enabled, mesh, recalculateRoute, startCellId, goalCellId, roadEdges]);
 
   return (
     <BlurCard title="Logistics">

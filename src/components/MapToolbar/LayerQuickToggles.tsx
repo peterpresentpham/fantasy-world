@@ -22,6 +22,7 @@ export default function LayerQuickToggles() {
             size="sm"
             variant={active?.id === preset.id ? 'default' : 'ghost'}
             aria-pressed={active?.id === preset.id}
+            title={preset.description}
             onClick={() => setDisplaySettings(applyViewPreset(displaySettings, preset))}
           >
             {preset.label}

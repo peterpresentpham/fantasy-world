@@ -5,6 +5,7 @@ import { VIEW_PRESETS } from 'src/configs/map/viewPresets';
 import { isTypingTarget, resolveHotkey } from 'src/services/utils/hotkeys';
 import { generateRandomSeed } from 'src/services/utils/seed';
 import { applyViewPreset } from 'src/services/utils/viewPreset';
+import { useLogisticsGameStore } from 'src/store/logisticsGameStore';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
 import { useUiStore } from 'src/store/uiStore';
 import { useViewportStore } from 'src/store/viewportStore';
@@ -39,10 +40,16 @@ export default function useMapHotkeys() {
         case 'zoomReset':
           viewport.reset();
           break;
+        case 'toggleRoute': {
+          const game = useLogisticsGameStore.getState();
+          game.setEnabled(!game.enabled);
+          break;
+        }
         case 'closePanel': {
           const ui = useUiStore.getState();
           if (ui.detailOpen) ui.closeDetail();
           else if (ui.configOpen) ui.setConfigOpen(false);
+          else if (ui.toolsOpen) ui.setToolsOpen(false);
           else return;
           break;
         }

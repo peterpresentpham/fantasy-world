@@ -1,5 +1,6 @@
-import { BORDER_CONFIG } from 'src/configs/map/geopolitics';
+import { BORDER_CONFIG, NATION_SEED_CONFIG } from 'src/configs/map/geopolitics';
 import { TBorderType, TCell } from 'src/types/global';
+import { getCityCells } from './cities';
 import { isLand } from './shared';
 
 export default class Cost {
@@ -43,6 +44,33 @@ export default class Cost {
     const biomeCost = profile.biomeCost[cell.biome];
     return landformCost * 0.7 + biomeCost * 0.3;
   }
+}
+
+/**
+ * Per cell, how much living nearby (population smoothed over the neighbours, square-rooted so a big
+ * city does not drown out every other settled valley) is worth as a nation seed.
+ */
+export function buildPopulationSeedBonus(cells: TCell[]) {
+  let current = Float64Array.from(cells, (cell) => (isLand(cell) ? cell.population : 0));
+  for (let pass = 0; pass < NATION_SEED_CONFIG.smoothingPasses; pass += 1) {
+    const next = new Float64Array(current.length);
+    for (let id = 0; id < cells.length; id += 1) {
+      if (!isLand(cells[id])) continue;
+      let sum = current[id];
+      for (const neighborId of cells[id].neighbors) sum += current[neighborId];
+      next[id] = sum / (cells[id].neighbors.length + 1);
+    }
+    current = next;
+  }
+  const max = current.reduce((a, b) => Math.max(a, b), 0);
+  const cityCells = new Set(getCityCells(cells));
+  return current.map((value, id) => {
+    if (max <= 0) return 0;
+    return (
+      Math.sqrt(value / max) * NATION_SEED_CONFIG.populationWeight +
+      (cityCells.has(id) ? NATION_SEED_CONFIG.cityBonus : 0)
+    );
+  });
 }
 
 export function getNationSeedSuitability(cellId: number, cells: TCell[]) {

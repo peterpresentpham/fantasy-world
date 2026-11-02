@@ -2,11 +2,11 @@
 
 Code: `src/services/geopolitics/`. Constants: `src/configs/map/geopolitics.ts`. `buildGeopolitics` (in `index.ts`) runs these steps in this order; changing the order changes every world.
 
-1. **Nations**: `buildLandNations` (`nations/`).
-2. **Nation clean-up**: stability pass (terrain alignment, mountain-split limit, minimum area), contiguity, stability pass, `finalizeNationBorders`, `diversifySmallNationSizes`, `finalizeNationBorders`.
-3. **Nation profiles**: a random population multiplier (0.1–5.0) and economy multiplier (0.1–20) per nation, applied to the population stage's cell values with small terrain modifiers, then a floor of 500 people per nation.
-4. **Provinces** (`provinces/`) and their post-processing.
-5. **Ethnic regions** (`ethnic/`).
+1. **Peoples** (`ethnic/`): drawn from geography alone, before any nation. Each cell gets a provisional `ethnicId` that nation borders use in step 2.
+2. **Nations**: `buildLandNations` (`nations/`). Seeds favour plains, valleys, water and, with a weight of 1.8, settled land (population smoothed over the neighbours and square-rooted); a city (a land cell no neighbour out-populates, at least 12% of the biggest city) adds another 2.5, so nations tend to grow from a city. Right after the expansion `keepCitiesWhole` (`cities.ts`) gives every land cell within two steps of a city to the nation that holds the city, biggest cities first, so no border runs through a city; the clean-up passes then repair connectivity. A border step from one people into another costs an extra 9 (rivers cost 7.8, ridges 10.5), so borders often end where a people ends.
+3. **Nation clean-up**: stability pass (terrain alignment, mountain-split limit, minimum area), contiguity, stability pass, `finalizeNationBorders`, `diversifySmallNationSizes`, `finalizeNationBorders`.
+4. **Nation profiles**: a small random population multiplier (0.85–1.15) and economy multiplier (0.8–1.25) per nation, so a nation's size comes from its land,, applied to the population stage's cell values with small terrain modifiers, then a floor of 500 people per nation.
+5. **Provinces** (`provinces/`) and their post-processing.
 6. **Final projection**: maritime zones, capitals and hubs (`capitals.ts`), and the per-cell `nationId`, `provinceId`, `ethnicId`, `zoneType`.
 
 The population stage runs before this (see [world-generation.md](./world-generation.md)); nations do not feed back into it.
@@ -30,17 +30,18 @@ Seeds are placed per nation (preferring plains, valleys and coast, keeping their
 
 ## Ethnic regions (`ethnic/`)
 
-- `field.ts` picks seeds per landmass (plains, valleys, rivers preferred) and floods a geography field where forest, wetland, mountain and desert cost more; crossing a nation border costs little.
-- `dominance.ts` then repaints each nation so one group is the clear majority (about 54–58%) with a smaller secondary group, `distribution.ts` spreads groups that sit in only one nation across a border, and `smoothing.ts` cleans the edges. Groups under a minimum population are merged.
+Peoples exist before nations and know nothing about them. `field.ts` gives each landmass about one people per 1300 land cells and at least 1.5 per expected nation on it (expected nations are shared out by land), up to 12, seeded on plains, valleys and rivers, and floods a geography field where forest, wetland, mountain and desert cost more. Islands under 150 cells get no people of their own and take the nearest one. Then `dominance.ts` adds small mountain fragments, `smoothing.ts` cleans the edges, and peoples under a minimum population are merged.
+
+On a default map this gives about 13 peoples for 10 nations. A people typically spans about 2 nations, and 37% of nation-border edges are also people borders (without the border cost it is 11%, and 4.8% of all land edges separate two peoples).
 
 ## Capitals and hubs (`capitals.ts`)
 
-A capital scores population, economy, centrality (far from borders and, today, from the coast), safety and connectivity; it is drawn from the top few percent, or is the best cell in small nations. One to three economic hubs per nation (by size) favour economy and water access and keep their distance from the capital and each other.
+A capital scores population (most weight), economy, access to water (coast or river), distance from land borders, safety and connectivity. Interior cells are preferred, but any cell with at least 85% of the nation's biggest population is also a candidate, so the capital is the nation's main city even close to a border; it may be on a coast or river. In 12 test maps 96% of capitals were the main city or next to it (54% before). One to three economic hubs per nation (by size) favour economy and water access and keep their distance from the capital and each other.
 
 ## Maritime zones
 
-`assignMaritimeZones` marks water cells as `land`, `territorial` or `international-waters` in `zoneType`; today every water cell is international.
+`assignMaritimeZones` walks outwards from every owned land cell. A lake is `internal-waters` of the nation around it however wide it is. Sea within 0.028 of the map diagonal of a coast is `territorial-waters` of the nearest coast's nation (counted in cells and scaled by cell spacing, so it does not depend on the cell count), and a strait is split between the two coasts. The rest is `international-waters`. Water cells carry the owner's `nationId`; statistics still filter on `!isWater`.
 
 ## Known limits
 
-See [roadmap.md](./roadmap.md): nation and ethnic layers are built on terrain only, cities are not tied to nations, and the multipliers in step 3 are independent of geography.
+See [roadmap.md](./roadmap.md): the population stage still draws a few cities (4 to 18) and nations lean towards them rather than being built from a fixed city list, and the remaining random factor in step 4 is small.

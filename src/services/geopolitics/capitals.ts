@@ -3,17 +3,17 @@ import { LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
 import { getMetricRange } from 'src/services/utils';
 import { isWaterOrRiverCell } from 'src/services/utils/cell';
 import { buildDistanceMap, collectConnectedComponents } from 'src/services/utils/graph';
-import { createSeededRandom, normalize } from 'src/services/utils/math';
+import { normalize } from 'src/services/utils/math';
 import { TCell, TNation } from 'src/types/global';
 import { CAPITAL_VIEWPORT_MARGIN, createRegionalName, isLand } from './shared';
 
 type TNationProfile = Pick<TNation, 'populationMultiplier' | 'economyMultiplier'>;
 
 const T_COMPONENT_SHARE_THRESHOLD = 0.3;
-const T_MIN_WEIGHT = 1e-6;
 const T_STRICT_VIEWPORT_MARGIN = CAPITAL_VIEWPORT_MARGIN + 8;
 const T_STRICT_BORDER_DISTANCE_MIN = 2;
-const T_SMALL_NATION_ARGMAX_THRESHOLD = 220;
+// Cells at least this share of the nation's biggest population may be capital even near a border.
+const T_MAIN_CITY_SHARE = 0.85;
 
 function getDistanceMap(
   cells: TCell[],
@@ -68,18 +68,11 @@ function exponentialEdgePenalty(distance: number, radius: number, penaltyBase: n
   return penaltyBase * Math.exp((radius - distance) * 0.95);
 }
 
-function getHeartlandCentralityScore(borderDistance: number, coastDistance: number) {
-  if (borderDistance < 0 && coastDistance < 0) return -1;
-
-  const borderNorm = borderDistance < 0 ? 0 : Math.min(1, borderDistance / 6);
-  const coastNorm = coastDistance < 0 ? 0 : Math.min(1, coastDistance / 5);
-  const coreBalance = 1 - Math.min(1, Math.abs(borderNorm - coastNorm));
-  const deepCore = Math.min(borderNorm, coastNorm);
-
-  const borderPenalty = exponentialEdgePenalty(borderDistance, 2, 0.95);
-  const coastPenalty = exponentialEdgePenalty(coastDistance, 2, 0.75);
-
-  return deepCore * 0.7 + coreBalance * 0.3 - borderPenalty - coastPenalty;
+// Capitals may sit on a coast or a river; they only avoid hugging a land border.
+function getBorderSafetyScore(borderDistance: number) {
+  if (borderDistance < 0) return 0.5;
+  const norm = Math.min(1, borderDistance / 6);
+  return norm - exponentialEdgePenalty(borderDistance, 2, 0.5);
 }
 
 function getNationConnectivityScore(cell: TCell, nationLand: Set<number>) {
@@ -96,13 +89,11 @@ function scoreCapital(
   economy: number,
   connectivity: number,
   borderDistanceMap: Int32Array,
-  coastDistanceMap: Int32Array,
+  waterAccess: number,
   mapWidth: number,
   mapHeight: number
 ) {
-  const borderDistance = borderDistanceMap[cell.id];
-  const coastDistance = coastDistanceMap[cell.id];
-  const centralityScore = getHeartlandCentralityScore(borderDistance, coastDistance);
+  const borderSafety = getBorderSafetyScore(borderDistanceMap[cell.id]);
 
   const edgeDistance = Math.min(
     cell.site[0],
@@ -122,12 +113,14 @@ function scoreCapital(
     terrainFlatness * 0.65 + (cell.landform === 'plain' || cell.landform === 'valley' ? 0.35 : 0);
   const adjustedSafety = safetyScore * 0.6 + terrainBias * 0.4 + edgeSafety * 0.15;
 
+  // The biggest and richest place wins, helped by water (trade, farming) and a safe interior.
   return (
-    population * 0.25 +
-    economy * 0.2 +
-    centralityScore * 0.35 +
-    adjustedSafety * 0.1 +
-    connectivity * 0.1
+    population * 0.55 +
+    economy * 0.15 +
+    waterAccess * 0.15 +
+    borderSafety * 0.1 +
+    adjustedSafety * 0.03 +
+    connectivity * 0.02
   );
 }
 
@@ -170,7 +163,6 @@ export function pickEconomicAndCapital(
     const safeNationCells = nationCells.filter((cell) => isInBounds(cell, mapWidth, mapHeight));
     const candidateNationCells = safeNationCells.length > 0 ? safeNationCells : nationCells;
     const landSize = nationCells.length;
-    const random = createSeededRandom(`${seed}:${nationId}:capital`);
 
     let hubCount = 1;
     if (landSize >= GEOPOLITICAL_CONFIG.hubs.mediumNationMinLand) hubCount = 3;
@@ -195,12 +187,24 @@ export function pickEconomicAndCapital(
       const coastDistance = coastDistanceMap[cell.id];
       return (
         borderDistance >= T_STRICT_BORDER_DISTANCE_MIN &&
-        coastDistance >= 1 &&
+        coastDistance >= 0 &&
         getNationConnectivityScore(cell, nationLand) >= 2
       );
     });
+    // A nation's main city is its capital even close to a border; only a much smaller place
+    // is passed over for being safer.
+    const biggestPopulation = candidateNationCells.reduce(
+      (max, cell) => Math.max(max, cell.population),
+      0
+    );
+    const strictIds = new Set(strictInteriorCells.map((cell) => cell.id));
     const scoredCandidateCells =
-      strictInteriorCells.length > 0 ? strictInteriorCells : candidateNationCells;
+      strictInteriorCells.length > 0
+        ? candidateNationCells.filter(
+            (cell) =>
+              strictIds.has(cell.id) || cell.population >= biggestPopulation * T_MAIN_CITY_SHARE
+          )
+        : candidateNationCells;
 
     const populationValues = scoredCandidateCells.map((cell) => Math.max(0, cell.population));
     const economyValues = scoredCandidateCells.map((cell) => Math.max(0, cell.economy));
@@ -232,7 +236,7 @@ export function pickEconomicAndCapital(
             economy,
             connectivity,
             borderDistanceMap,
-            coastDistanceMap,
+            waterProximityScore(cell, cells),
             mapWidth,
             mapHeight
           ),
@@ -240,38 +244,8 @@ export function pickEconomicAndCapital(
       })
       .sort((a, b) => b.score - a.score);
 
-    const topCount = Math.max(1, Math.floor(capitalCandidates.length * 0.05));
-    const topCandidates = capitalCandidates.slice(0, topCount);
-    let capitalCellId: number | null = null;
-
-    const useArgmaxOnly = landSize <= T_SMALL_NATION_ARGMAX_THRESHOLD;
-    if (useArgmaxOnly && capitalCandidates.length > 0) {
-      capitalCellId = capitalCandidates[0].cellId;
-    } else if (topCandidates.length > 0) {
-      let totalWeight = 0;
-      for (const candidate of topCandidates) {
-        totalWeight += Math.max(
-          T_MIN_WEIGHT,
-          candidate.score - (topCandidates[topCandidates.length - 1]?.score ?? 0) + T_MIN_WEIGHT
-        );
-      }
-      let needle = random() * totalWeight;
-      for (const candidate of topCandidates) {
-        needle -= Math.max(
-          T_MIN_WEIGHT,
-          candidate.score - (topCandidates[topCandidates.length - 1]?.score ?? 0) + T_MIN_WEIGHT
-        );
-        if (needle <= 0) {
-          capitalCellId = candidate.cellId;
-          break;
-        }
-      }
-      if (capitalCellId === null) capitalCellId = topCandidates[topCandidates.length - 1].cellId;
-    }
-
-    if (capitalCellId === null && capitalCandidates.length > 0) {
-      capitalCellId = capitalCandidates[0].cellId;
-    }
+    // The best-scoring place is the capital; no dice, so the capital is the nation's main city.
+    let capitalCellId: number | null = capitalCandidates[0]?.cellId ?? null;
 
     const hubScored = scoredCandidateCells
       .map((cell) => {

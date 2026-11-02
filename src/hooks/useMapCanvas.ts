@@ -1,6 +1,7 @@
 'use client';
 
 import { RefObject, useEffect, useMemo } from 'react';
+import { MINOR_RIVER_ZOOM } from 'src/configs/map/viewport';
 import { useMapContext } from 'src/contexts/map.context';
 import { renderIsometric, renderTopDown } from 'src/services/rendering';
 import { createLayerPlan } from 'src/services/rendering/canvas';
@@ -37,6 +38,8 @@ export default function useMapCanvas({ canvasRef }: TProps) {
       routeCellIds: s.routeCellIds,
     }))
   );
+  // A boolean selector: the map only redraws when the zoom crosses the threshold.
+  const showMinorRivers = useViewportStore((s) => s.viewport.scale >= MINOR_RIVER_ZOOM);
   const { mesh, paintVersion } = useMapContext();
   const { cells, width, height, nations, ethnics } = mesh;
   const isIso = displaySettings.isometric;
@@ -127,6 +130,7 @@ export default function useMapCanvas({ canvasRef }: TProps) {
         startCellId,
         goalCellId,
         seaLevel,
+        showMinorRivers,
       });
     }
     useViewportStore.getState().bumpRender();
@@ -153,5 +157,6 @@ export default function useMapCanvas({ canvasRef }: TProps) {
     layerPlan,
     mapCellStats,
     seaLevel,
+    showMinorRivers,
   ]);
 }

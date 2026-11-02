@@ -1,9 +1,13 @@
-import { TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
+import { TECTONIC_PRESET_SCALE, TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
 import { clamp } from 'src/services/utils/math';
 import { TDelaunayMesh, TTopographyCell, TTopographyParams } from 'src/types/global';
+import { buildBoundaryField } from './boundaryField';
 import { computeBaseElevations } from './computeElevation';
 import { simulateHydraulicErosion } from './erosion';
 import { applyTopography } from './preset';
+import { applySeaFloor } from './seaFloor';
+import { buildTerrainGuide } from './terrainGuide';
+import { getTargetLandFraction, remapToLandFraction } from './seaLevel';
 import { generatePlates } from './tectonics';
 
 function buildCellTopography(elevation: number, seaLevel: number): TTopographyCell {
@@ -42,11 +46,50 @@ export function buildTopography(params: TTopographyParams): TDelaunayMesh {
   const cellSites = mesh.cells.map((c) => c.site);
   const { plates, cellPlateId } = generatePlates(seed, mesh.width, mesh.height, cellSites);
 
+  const boundaryField = buildBoundaryField(
+    mesh.cells.map((c) => c.neighbors),
+    cellSites,
+    plates,
+    cellPlateId,
+    mesh.width,
+    mesh.height,
+    seaLevel
+  );
+  const guide = buildTerrainGuide(mesh, boundaryField);
+
   // 2. Compute raw elevations from noise + tectonics
-  const baseElevations = computeBaseElevations(mesh, seed, seaLevel, plates, cellPlateId);
+  const baseElevations = computeBaseElevations(
+    mesh,
+    seed,
+    seaLevel,
+    plates,
+    cellPlateId,
+    TECTONIC_PRESET_SCALE[topography],
+    boundaryField
+  );
 
   // 3. Apply terrain preset (shape modifiers)
-  const presetElevations = applyTopography({ mesh, seed, topography, elevations: baseElevations });
+  const shapedElevations = applyTopography({
+    mesh,
+    seed,
+    topography,
+    elevations: baseElevations,
+    guide,
+  });
+  // Move the sea so the land share matches the preset instead of depending on the seed's noise.
+  const landElevations = remapToLandFraction(
+    shapedElevations,
+    seaLevel,
+    getTargetLandFraction(topography, seaLevel)
+  );
+  // Shelf, slope and basin by distance from the coast.
+  const presetElevations = applySeaFloor(
+    landElevations,
+    mesh.cells.map((c) => c.neighbors),
+    seaLevel,
+    Math.sqrt((mesh.width * mesh.height) / mesh.cells.length),
+    Math.hypot(mesh.width, mesh.height)
+  );
 
   // 4. Reinforce high mountain peaks
   const elevations = reinforceHighMountains(presetElevations, seaLevel);

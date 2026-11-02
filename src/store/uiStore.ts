@@ -22,6 +22,8 @@ const CONFIG_PANELS: readonly TConfigPanel[] = [
   'terrain',
 ];
 
+export type TTheme = 'dark' | 'parchment';
+
 type TToolbarPosition = { x: number; y: number };
 
 type TUiState = {
@@ -34,8 +36,18 @@ type TUiState = {
   detailEthnicId: number | null;
   /** the welcome screen was dismissed once */
   introSeen: boolean;
+  /** phone: the detail sheet shows its body, not just the header; not persisted */
+  detailExpanded: boolean;
   /** reopened on demand (the ? button) after it was already seen; not persisted */
   introReopened: boolean;
+  /** phone toolbar: the tools sheet is open; not persisted */
+  toolsOpen: boolean;
+  /** colour theme of the interface */
+  theme: TTheme;
+  /** map legend expanded */
+  legendOpen: boolean;
+  /** world summary card expanded */
+  summaryOpen: boolean;
   /** pixels inside the map area; null = default (centered at the top) */
   toolbarPosition: TToolbarPosition | null;
 };
@@ -47,9 +59,14 @@ type TUiActions = {
   setToolbarCollapsed: (collapsed: boolean) => void;
   openDetail: (nationId: number | null, ethnicId: number | null) => void;
   closeDetail: () => void;
+  setDetailExpanded: (expanded: boolean) => void;
   showIntro: () => void;
   dismissIntro: () => void;
   setToolbarPosition: (position: TToolbarPosition | null) => void;
+  setLegendOpen: (open: boolean) => void;
+  setToolsOpen: (open: boolean) => void;
+  setSummaryOpen: (open: boolean) => void;
+  setTheme: (theme: TTheme) => void;
 };
 
 export const useUiStore = create<TUiState & TUiActions>()(
@@ -61,9 +78,17 @@ export const useUiStore = create<TUiState & TUiActions>()(
       detailOpen: false,
       detailNationId: null,
       detailEthnicId: null,
+      detailExpanded: false,
       introSeen: false,
       introReopened: false,
+      legendOpen: true,
+      toolsOpen: false,
+      theme: 'dark',
+      summaryOpen: false,
       toolbarPosition: null,
+      setTheme(theme) {
+        set({ theme });
+      },
       setConfigOpen(configOpen) {
         set({ configOpen });
       },
@@ -78,7 +103,10 @@ export const useUiStore = create<TUiState & TUiActions>()(
         }));
       },
       openDetail(detailNationId, detailEthnicId) {
-        set({ detailOpen: true, detailNationId, detailEthnicId });
+        set({ detailOpen: true, detailNationId, detailEthnicId, detailExpanded: false });
+      },
+      setDetailExpanded(detailExpanded) {
+        set({ detailExpanded });
       },
       closeDetail() {
         set({ detailOpen: false });
@@ -95,6 +123,15 @@ export const useUiStore = create<TUiState & TUiActions>()(
       setToolbarPosition(toolbarPosition) {
         set({ toolbarPosition });
       },
+      setToolsOpen(toolsOpen) {
+        set({ toolsOpen });
+      },
+      setLegendOpen(legendOpen) {
+        set({ legendOpen });
+      },
+      setSummaryOpen(summaryOpen) {
+        set({ summaryOpen });
+      },
     }),
     {
       name: 'ui-state',
@@ -102,6 +139,9 @@ export const useUiStore = create<TUiState & TUiActions>()(
         configPanel: state.configPanel,
         toolbarCollapsed: state.toolbarCollapsed,
         introSeen: state.introSeen,
+        legendOpen: state.legendOpen,
+        summaryOpen: state.summaryOpen,
+        theme: state.theme,
         toolbarPosition: state.toolbarPosition,
       }),
       version: 3,
@@ -120,6 +160,9 @@ export const useUiStore = create<TUiState & TUiActions>()(
               : current.configPanel,
           toolbarCollapsed: stored?.toolbarCollapsed === true,
           introSeen: stored?.introSeen === true,
+          legendOpen: stored?.legendOpen !== false,
+          summaryOpen: stored?.summaryOpen === true,
+          theme: stored?.theme === 'parchment' ? 'parchment' : 'dark',
           toolbarPosition: validPosition,
         };
       },

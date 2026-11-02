@@ -1,64 +1,8 @@
-import { TFifoQueue } from 'src/services/utils/collections';
 import { findNearestCell } from 'src/services/utils/geometry';
 import { TCell, TEthnic } from 'src/types/global';
 import { isLand } from '../shared';
 
 const T_MIN_ETHNIC_POPULATION = 1000;
-
-export function spreadEthnicsAcrossNations(
-  cells: TCell[],
-  nationOwner: Int32Array,
-  ethnicOwner: Int32Array,
-  ethnics: TEthnic[]
-) {
-  for (const group of ethnics) {
-    const nationIds = new Set<number>();
-    for (const cell of cells) {
-      if (!isLand(cell)) continue;
-      if (ethnicOwner[cell.id] !== group.id) continue;
-      const nationId = nationOwner[cell.id];
-      if (nationId >= 0) nationIds.add(nationId);
-    }
-    if (nationIds.size >= 2) continue;
-
-    const candidateBorders: number[] = [];
-    for (const cell of cells) {
-      if (!isLand(cell)) continue;
-      if (ethnicOwner[cell.id] !== group.id) continue;
-      const cellNationId = nationOwner[cell.id];
-      if (cellNationId < 0) continue;
-      for (const neighborId of cell.neighbors) {
-        if (!isLand(cells[neighborId])) continue;
-        if (nationOwner[neighborId] === cellNationId) continue;
-        candidateBorders.push(neighborId);
-      }
-    }
-    if (candidateBorders.length === 0) continue;
-
-    let painted = 0;
-    const uniqueBorderCells = [...new Set(candidateBorders)];
-    const queue = new TFifoQueue<number>();
-    for (const cellId of uniqueBorderCells) {
-      queue.enqueue(cellId);
-    }
-    const visited = new Set<number>(uniqueBorderCells);
-    while (queue.size > 0 && painted < 18) {
-      const currentId = queue.dequeue() as number;
-      if (!isLand(cells[currentId])) continue;
-      if (ethnicOwner[currentId] !== group.id) {
-        ethnicOwner[currentId] = group.id;
-        painted += 1;
-      }
-      for (const neighborId of cells[currentId].neighbors) {
-        if (visited.has(neighborId)) continue;
-        if (!isLand(cells[neighborId])) continue;
-        if (nationOwner[neighborId] !== nationOwner[currentId]) continue;
-        visited.add(neighborId);
-        queue.enqueue(neighborId);
-      }
-    }
-  }
-}
 
 export function fillUnclaimedEthnicLand(cells: TCell[], ethnicOwner: Int32Array) {
   const claimedLandIds = cells

@@ -13,12 +13,14 @@ import {
   applyHotspots,
   smoothElevations,
 } from './shape';
+import { TTerrainGuide } from './terrainGuide';
 
 interface TApplyTopographyParams {
   mesh: TMesh;
   seed: string;
   topography: TTopography;
   elevations: Float32Array;
+  guide?: TTerrainGuide;
 }
 
 function applyGlobalScale(elevations: Float32Array, offset: number, scale: number) {
@@ -34,7 +36,13 @@ const archipelago = TOPOGRAPHY_PRESET_CONFIG.archipelago;
 const volcanic = TOPOGRAPHY_PRESET_CONFIG.volcanic;
 const continental = TOPOGRAPHY_PRESET_CONFIG.continental;
 
-export function applyTopography({ mesh, seed, topography, elevations }: TApplyTopographyParams) {
+export function applyTopography({
+  mesh,
+  seed,
+  topography,
+  elevations,
+  guide,
+}: TApplyTopographyParams) {
   const random = createSeededRandom(`${seed}:${topography}:terrain-tools`);
   const nextElevations = Float32Array.from(elevations);
 
@@ -143,7 +151,7 @@ export function applyTopography({ mesh, seed, topography, elevations }: TApplyTo
   // Rugged terrain driven by hotspot volcanoes and lava plateaus.
   if (topography === 'volcanic') {
     // Hotspot volcanoes
-    applyHotspots(mesh, random, nextElevations);
+    applyHotspots(mesh, random, nextElevations, guide);
     // Volcanic ridges (range bands)
     applyRangeBands(mesh, random, nextElevations, volcanic.rangeBands);
     // Small-scale hill clusters for rough lava terrain

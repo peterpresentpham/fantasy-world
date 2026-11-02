@@ -22,8 +22,9 @@ function signedLatitude(y: number, height: number) {
 
 function baseWind(latitude: number) {
   const absLat = Math.abs(latitude);
-  const toEquator = latitude > 0 ? 1 : -1;
-  const toPole = latitude > 0 ? -1 : 1;
+  // Canvas y grows downward, so the southern half (latitude > 0) reaches the equator by decreasing y.
+  const toEquator = latitude > 0 ? -1 : 1;
+  const toPole = latitude > 0 ? 1 : -1;
 
   if (absLat <= WIND_MODEL.tradeLatMax) {
     const equatorBlend = 1 - absLat / Math.max(0.0001, WIND_MODEL.tradeLatMax);

@@ -57,12 +57,24 @@ interface TProps {
   children: ReactNode;
 }
 
+// Sets the saved theme before the first paint so a parchment visitor never sees the dark page.
+const THEME_SCRIPT = [
+  'try{',
+  'var t=JSON.parse(localStorage.getItem("ui-state")||"{}").state;',
+  'if(t&&t.theme==="parchment")document.documentElement.dataset.theme="parchment"',
+  '}catch(e){}',
+].join('');
+
 export default function RootLayout({ children }: TProps) {
   return (
     <html
       lang="en"
+      suppressHydrationWarning
       className={cn('font-sans', geist.variable, fellEnglish.variable, medievalSharp.variable)}
     >
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+      </head>
       <body className={cn('flex min-h-full flex-col antialiased', firaCode.className)}>
         <MapLayout>{children}</MapLayout>
       </body>

@@ -77,6 +77,21 @@ describe('determinism', () => {
   });
 });
 
+describe('rivers on small islands', () => {
+  it('archipelagos still have rivers (islands need less flow to start one)', () => {
+    let land = 0;
+    let river = 0;
+    for (const seed of ['isles-a', 'isles-b', 'isles-c']) {
+      const { cells } = generate(
+        makeConfig(seed, { topography: 'archipelago', cellCount: 6000 })
+      ).geopolitics;
+      land += cells.filter((c) => !c.isWater).length;
+      river += cells.filter((c) => c.isRiver).length;
+    }
+    expect(river / land).toBeGreaterThan(0.008);
+  });
+});
+
 describe('sortIndicesByElevation', () => {
   it('orders indices by descending elevation, ties by index', () => {
     const elevation = Float32Array.from([0.5, 0.1, 0.9, 0.3]);
@@ -149,6 +164,48 @@ describe.each(CONFIGS.map((config) => [label(config), config] as const))(
       const { cells, nations } = stages.geopolitics;
       for (const nation of nations) {
         expect(cells.some((c) => c.nationId === nation.id && !c.isWater)).toBe(true);
+      }
+    });
+
+    it('capitals sit in the main city of their landmass', () => {
+      const { cells, nations } = stages.geopolitics;
+      let inMainCity = 0;
+      let counted = 0;
+      for (const nation of nations) {
+        if (nation.capitalCellId === null) continue;
+        // The landmass of the nation that holds the capital (a nation can span islands).
+        const seen = new Set<number>([nation.capitalCellId]);
+        const queue = [nation.capitalCellId];
+        for (let head = 0; head < queue.length; head += 1) {
+          for (const n of cells[queue[head]].neighbors) {
+            if (seen.has(n) || cells[n].isWater || cells[n].nationId !== nation.id) continue;
+            seen.add(n);
+            queue.push(n);
+          }
+        }
+        const biggest = Math.max(...queue.map((id) => cells[id].population));
+        counted += 1;
+        if (cells[nation.capitalCellId].population >= biggest * 0.7) inMainCity += 1;
+      }
+      expect(inMainCity / counted).toBeGreaterThanOrEqual(0.75);
+    });
+
+    it('sea is owned only by a nation, and only near that nation or inside it', () => {
+      const { cells, nations } = stages.geopolitics;
+      const ids = new Set(nations.map((n) => n.id));
+      for (const cell of cells) {
+        if (!cell.isWater) {
+          expect(cell.zoneType).toBe('land');
+          continue;
+        }
+        if (cell.zoneType === 'international-waters') {
+          expect(cell.nationId).toBeNull();
+        } else {
+          expect(['territorial-waters', 'internal-waters']).toContain(cell.zoneType);
+          expect(ids.has(cell.nationId as number)).toBe(true);
+          // Owned water touches, or chains back to, land of the same nation.
+          expect(cells.some((c) => !c.isWater && c.nationId === cell.nationId)).toBe(true);
+        }
       }
     });
 

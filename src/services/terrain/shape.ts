@@ -1,6 +1,7 @@
 import { TMesh } from 'src/types/global';
 import { distanceToSegment } from 'src/services/utils/geometry';
 import { clamp, smoothStep } from 'src/services/utils/math';
+import { TTerrainGuide } from './terrainGuide';
 
 type TRangeBandOptions = {
   count: number;
@@ -188,34 +189,47 @@ export function applyValleyBands(
   }
 }
 
+const ISLAND_TRIES = 40;
+/** Islands closer than (radiusA + radiusB) × this are pushed apart so they do not merge into one. */
+const ISLAND_SPACING = 1.5;
+
 function buildIslandSeeds(random: () => number, options: TArchipelagoOptions): TIslandSeed[] {
   const seeds: TIslandSeed[] = [];
+  const tiers = [
+    {
+      count: options.majorIslandCount,
+      margin: 0.12,
+      radius: [0.08, 0.06],
+      amplitude: [0.62, 0.12],
+    },
+    {
+      count: options.mediumIslandCount,
+      margin: 0.06,
+      radius: [0.04, 0.04],
+      amplitude: [0.58, 0.12],
+    },
+    { count: options.smallIslandCount, margin: 0.03, radius: [0.045, 0.03], amplitude: [0.7, 0.1] },
+  ];
 
-  for (let index = 0; index < options.majorIslandCount; index += 1) {
-    seeds.push({
-      x: 0.14 + random() * 0.72,
-      y: 0.14 + random() * 0.72,
-      radius: 0.16 + random() * 0.11,
-      amplitude: 0.55 + random() * 0.12,
-    });
-  }
-
-  for (let index = 0; index < options.mediumIslandCount; index += 1) {
-    seeds.push({
-      x: 0.06 + random() * 0.88,
-      y: 0.06 + random() * 0.88,
-      radius: 0.09 + random() * 0.08,
-      amplitude: 0.32 + random() * 0.13,
-    });
-  }
-
-  for (let index = 0; index < options.smallIslandCount; index += 1) {
-    seeds.push({
-      x: 0.03 + random() * 0.94,
-      y: 0.03 + random() * 0.94,
-      radius: 0.04 + random() * 0.045,
-      amplitude: 0.18 + random() * 0.11,
-    });
+  for (const tier of tiers) {
+    for (let index = 0; index < tier.count; index += 1) {
+      for (let attempt = 0; attempt < ISLAND_TRIES; attempt += 1) {
+        const candidate: TIslandSeed = {
+          x: tier.margin + random() * (1 - tier.margin * 2),
+          y: tier.margin + random() * (1 - tier.margin * 2),
+          radius: tier.radius[0] + random() * tier.radius[1],
+          amplitude: tier.amplitude[0] + random() * tier.amplitude[1],
+        };
+        const crowded = seeds.some(
+          (other) =>
+            Math.hypot(other.x - candidate.x, other.y - candidate.y) <
+            (other.radius + candidate.radius) * ISLAND_SPACING
+        );
+        if (crowded) continue;
+        seeds.push(candidate);
+        break;
+      }
+    }
   }
 
   return seeds;
@@ -240,11 +254,11 @@ export function applyArchipelago(
       const dy = ny - seed.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
       const influence = Math.exp(-((distance * distance) / (2 * seed.radius * seed.radius)));
-      islandElevation += seed.amplitude * influence;
+      islandElevation = Math.max(islandElevation, seed.amplitude * influence);
     }
 
     // Keep channels between island groups to avoid one merged super-island.
-    const channelNoise = sampleDeterministicDetail(nx * 5.5, ny * 5.5, cellIndex) * 0.22;
+    const channelNoise = sampleDeterministicDetail(nx * 5.5, ny * 5.5, cellIndex) * 0.12;
     const baseOcean = 0.08 + (sampleDeterministicDetail(nx * 1.8, ny * 1.8, 717) - 0.5) * 0.06;
 
     elevations[cellIndex] = clamp(baseOcean + islandElevation - channelNoise, 0, 1);
@@ -338,13 +352,22 @@ export function applyPlateaus(
 }
 
 // Localised shield-volcano domes with optional caldera.
-export function applyHotspots(mesh: TMesh, random: () => number, elevations: Float32Array) {
+export function applyHotspots(
+  mesh: TMesh,
+  random: () => number,
+  elevations: Float32Array,
+  guide?: TTerrainGuide
+) {
   const hotspotCount = 1 + Math.floor(random() * 3);
   const diagNorm = Math.hypot(mesh.width, mesh.height);
 
   for (let h = 0; h < hotspotCount; h += 1) {
-    const cx = random() * mesh.width;
-    const cy = random() * mesh.height;
+    // A hotspot sits over a plate interior, away from any boundary.
+    const spot = guide?.interior.length
+      ? guide.interior[Math.floor(random() * guide.interior.length)]
+      : null;
+    const cx = spot ? spot[0] : random() * mesh.width;
+    const cy = spot ? spot[1] : random() * mesh.height;
     const baseRadius = diagNorm * (0.03 + random() * 0.06);
     const peakElev = 0.2 + random() * 0.25;
     const hasCaldera = random() > 0.5;

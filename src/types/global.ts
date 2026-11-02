@@ -102,7 +102,14 @@ export type TBorderType = 'nation' | 'province';
 export type TBorderConfig = {
   landformCost: TNumRecordLandform;
   biomeCost: TNumRecordBiome;
-  penalty: { riverCross: number; lakeCross: number; ridgeCross: number; shorelineEdgeBias: number };
+  penalty: {
+    riverCross: number;
+    lakeCross: number;
+    ridgeCross: number;
+    shorelineEdgeBias: number;
+    /** extra cost to step from one people into another when drawing borders */
+    ethnicCross: number;
+  };
   fragmentation: {
     maxMountainOwnersPerCluster: number;
     largeMountainClusterMinCells: number;

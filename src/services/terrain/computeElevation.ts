@@ -1,9 +1,10 @@
 import { TOPOGRAPHY_CONFIG } from 'src/configs/map/topography';
 import { clamp, createSeededRandom, hashSeed, smoothStep } from 'src/services/utils/math';
-import { TDelaunayMesh, TPoint } from 'src/types/global';
+import { TDelaunayMesh } from 'src/types/global';
 import { computeIsostaticElevation } from './isostasy';
 import { TNoiseSampler, createNoiseSampler } from './noise';
-import { TPlate, classifyBoundaryForCell } from './tectonics';
+import { TBoundaryField, buildBoundaryField } from './boundaryField';
+import { TPlate } from './tectonics';
 
 type TReliefSeed = {
   x: number;
@@ -16,15 +17,9 @@ type TCellElevationInput = {
   cellIndex: number;
   nx: number;
   ny: number;
-  cellX: number;
-  cellY: number;
-  neighbors: readonly number[];
-  cellSites: TPoint[];
-  plates: readonly TPlate[];
   cellPlateId: Int32Array;
-  meshWidth: number;
-  meshHeight: number;
-  seaLevel: number;
+  boundaryField: TBoundaryField;
+  tectonicScale: { uplift: number; rift: number };
 };
 
 const SEEDS = TOPOGRAPHY_CONFIG.seeds;
@@ -100,12 +95,9 @@ function computeCellElevation(
   warpHash: number,
   detailHash: number,
   upliftSeeds: TReliefSeed[],
-  basinSeeds: TReliefSeed[],
-  plates: readonly TPlate[],
-  cellPlateId: Int32Array
+  basinSeeds: TReliefSeed[]
 ): number {
-  const { cellIndex, nx, ny, cellX, cellY, neighbors, cellSites, meshWidth, meshHeight, seaLevel } =
-    input;
+  const { cellIndex, nx, ny, cellPlateId, boundaryField, tectonicScale } = input;
 
   // 1. Domain warping
   const { warpedX, warpedY } = computeWarpedCoords(nx, ny, noise, warpHash);
@@ -131,29 +123,9 @@ function computeCellElevation(
   const upliftField = sampleSeedField(warpedX, warpedY, upliftSeeds);
   const basinField = sampleSeedField(warpedX, warpedY, basinSeeds);
 
-  // 4. Tectonic boundary influence
-  const boundaryInfo = classifyBoundaryForCell(
-    cellIndex,
-    cellX,
-    cellY,
-    neighbors,
-    cellSites,
-    plates,
-    cellPlateId,
-    seaLevel,
-    meshWidth,
-    meshHeight
-  );
-
-  // Min distance to any boundary for isostasy
-  let distanceToAnyBoundary = 1;
-  for (const nid of neighbors) {
-    if (cellPlateId[nid] !== cellPlateId[cellIndex]) {
-      const ns = cellSites[nid];
-      const d = Math.hypot(cellX - ns[0], cellY - ns[1]) / Math.hypot(meshWidth, meshHeight);
-      if (d < distanceToAnyBoundary) distanceToAnyBoundary = d;
-    }
-  }
+  // 4. Tectonic boundary influence: how far the cell really is from a plate boundary
+  const boundaryInfo = boundaryField.info[cellIndex];
+  const distanceToAnyBoundary = boundaryField.distance[cellIndex];
 
   // 5. Isostatic elevation
   const isostaticElevation = computeIsostaticElevation(
@@ -169,30 +141,30 @@ function computeCellElevation(
   let tectonicRift = 0;
 
   if (boundaryInfo.boundaryKind !== 'none') {
-    const distNorm = boundaryInfo.distanceToBoundary / TECTONIC.boundaryInfluenceWidth;
-    const influence = clamp(1 - distNorm, 0, 1);
-    const influenceSq = influence * influence;
-    const jaggedness =
-      TOPOGRAPHY_CONFIG.noise.jaggedBase +
-      noise.value(
-        warpedX * TOPOGRAPHY_CONFIG.noise.jaggedFrequency,
-        warpedY * TOPOGRAPHY_CONFIG.noise.jaggedFrequency,
-        detailHash ^ cellIndex
-      ) *
-        TOPOGRAPHY_CONFIG.noise.jaggedRange;
+    const collision =
+      boundaryInfo.isContinental && boundaryInfo.neighborPlateKind === 'continental';
+    const width = TECTONIC.mountainHalfWidth * (collision ? TECTONIC.collisionWidthFactor : 1);
+    const falloff = Math.exp(-((distanceToAnyBoundary / width) ** 2));
+    // Ridged noise breaks the belt into chains and gaps instead of a uniform wall.
+    const chain =
+      TECTONIC.chainBase +
+      noise.ridged(warpedX * 3.2, warpedY * 3.2, detailHash ^ 0x2c1b3c6d) * TECTONIC.chainRange;
 
     if (boundaryInfo.boundaryKind === 'convergent') {
+      const rate = clamp(boundaryInfo.convergenceRate / TECTONIC.fullConvergenceRate, 0, 1);
       const isSubduction =
         !boundaryInfo.isContinental && boundaryInfo.neighborPlateKind === 'continental';
-      let baseUplift = boundaryInfo.convergenceRate * TECTONIC.convergentUpliftScale;
-      if (isSubduction) baseUplift *= TECTONIC.subductionArcBoost;
-      tectonicUplift = clamp(baseUplift * influenceSq * jaggedness * 0.5, 0, BLEND.maxUplift);
+      let amplitude = TECTONIC.convergentAmplitude;
+      if (collision) amplitude *= TECTONIC.collisionBoost;
+      // The oceanic side of a subduction zone sinks into a trench instead of rising.
+      if (isSubduction) tectonicRift = rate * falloff * TECTONIC.trenchDepth;
+      else tectonicUplift = clamp(rate * amplitude * falloff * chain, 0, BLEND.maxUplift);
     } else if (boundaryInfo.boundaryKind === 'divergent') {
-      const baseRift = boundaryInfo.divergenceRate * TECTONIC.divergentRiftScale;
-      if (!boundaryInfo.isContinental) {
-        tectonicUplift = clamp(baseRift * influenceSq * jaggedness * 0.15, 0, BLEND.maxUplift);
+      const rate = clamp(boundaryInfo.divergenceRate / TECTONIC.fullConvergenceRate, 0, 1);
+      if (boundaryInfo.isContinental) {
+        tectonicRift = clamp(rate * TECTONIC.riftDepth * falloff, 0, BLEND.maxRift);
       } else {
-        tectonicRift = clamp(baseRift * influenceSq * jaggedness * 0.5, 0, BLEND.maxRift);
+        tectonicUplift = clamp(rate * TECTONIC.ridgeAmplitude * falloff, 0, BLEND.maxUplift);
       }
     }
   }
@@ -213,13 +185,13 @@ function computeCellElevation(
       billowNoise * BLEND.billow +
       erosionMask * BLEND.erosionMask +
       upliftField * BLEND.upliftField +
-      tectonicUplift * BLEND.tectonicUplift +
+      tectonicUplift * tectonicScale.uplift * BLEND.tectonicUplift +
       coastNoise * BLEND.coastNoise +
       shelf * TOPOGRAPHY_CONFIG.shelf.weight +
       continentalBias * BLEND.continentalBias +
       isostaticElevation * BLEND.isostatic -
       basinField * BLEND.basinField -
-      tectonicRift * BLEND.tectonicRift,
+      tectonicRift * tectonicScale.rift * BLEND.tectonicRift,
     0,
     1
   );
@@ -231,13 +203,26 @@ export function computeBaseElevations(
   seed: string,
   seaLevel: number,
   plates: readonly TPlate[],
-  cellPlateId: Int32Array
+  cellPlateId: Int32Array,
+  tectonicScale: { uplift: number; rift: number } = { uplift: 1, rift: 1 },
+  precomputedField?: TBoundaryField
 ): Float32Array {
   const noise = createNoiseSampler();
   const macroHash = hashSeed(`${seed}:macro`);
   const warpHash = hashSeed(`${seed}:warp`);
   const detailHash = hashSeed(`${seed}:detail`);
   const cellSites = mesh.cells.map((c) => c.site);
+  const boundaryField =
+    precomputedField ??
+    buildBoundaryField(
+      mesh.cells.map((c) => c.neighbors),
+      cellSites,
+      plates,
+      cellPlateId,
+      mesh.width,
+      mesh.height,
+      seaLevel
+    );
 
   const upliftSeeds = buildReliefSeeds(seed, 'uplift-seeds', SEEDS.upliftCount, true);
   const basinSeeds = buildReliefSeeds(seed, 'basin-seeds', SEEDS.basinCount, false);
@@ -251,24 +236,16 @@ export function computeBaseElevations(
         cellIndex: i,
         nx: cell.site[0] / mesh.width,
         ny: cell.site[1] / mesh.height,
-        cellX: cell.site[0],
-        cellY: cell.site[1],
-        neighbors: cell.neighbors,
-        cellSites,
-        plates,
         cellPlateId,
-        meshWidth: mesh.width,
-        meshHeight: mesh.height,
-        seaLevel,
+        boundaryField,
+        tectonicScale,
       },
       noise,
       macroHash,
       warpHash,
       detailHash,
       upliftSeeds,
-      basinSeeds,
-      plates,
-      cellPlateId
+      basinSeeds
     );
   }
   return elevations;

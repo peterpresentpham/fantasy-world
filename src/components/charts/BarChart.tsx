@@ -68,7 +68,7 @@ export default function BarChart<T extends TBarChartData>({
           y1={margin.top + innerHeight}
           x2={margin.left + innerWidth}
           y2={margin.top + innerHeight}
-          stroke="rgba(255,255,255,0.35)"
+          stroke="var(--border)"
           strokeWidth={1}
         />
         {data.map((item, index) => {
@@ -109,7 +109,7 @@ export default function BarChart<T extends TBarChartData>({
                 y={margin.top + innerHeight + 16}
                 textAnchor="middle"
                 fontSize={11}
-                fill="rgba(255,255,255,0.9)"
+                fill="var(--foreground)"
               >
                 {item.label}
               </text>

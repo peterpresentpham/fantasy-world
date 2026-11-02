@@ -4,6 +4,7 @@ export type THotkeyAction =
   | { type: 'zoomIn' }
   | { type: 'zoomOut' }
   | { type: 'zoomReset' }
+  | { type: 'toggleRoute' }
   | { type: 'closePanel' };
 
 type TKeyInput = { key: string; ctrlKey: boolean; metaKey: boolean; altKey: boolean };
@@ -16,6 +17,7 @@ export function resolveHotkey({ key, ctrlKey, metaKey, altKey }: TKeyInput): THo
   if (key === '+' || key === '=') return { type: 'zoomIn' };
   if (key === '-' || key === '_') return { type: 'zoomOut' };
   if (key === '0') return { type: 'zoomReset' };
+  if (key === 't' || key === 'T') return { type: 'toggleRoute' };
   if (key === 'Escape') return { type: 'closePanel' };
   return null;
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { DEFAULT_CONFIG } from 'src/configs/map/common';
+import { generateRandomSeed } from 'src/services/utils/seed';
+import { parseWorldParams } from 'src/services/utils/worldUrl';
 import { TClimateControl, TDisplaySettings, TTopography } from 'src/types/global';
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
@@ -20,6 +22,8 @@ interface TMapExplorerState {
 
 type TMapExplorerActions = {
   setSeed: (seed: string) => void;
+  /** Switch to a whole world at once, so only one map is generated. */
+  applyWorld: (world: Pick<TMapExplorerState, 'seed' | 'topography'>) => void;
   setCellCount: (cellCount: number) => void;
   setSeaLevel: (seaLevel: number) => void;
   setTopography: (topography: TTopography) => void;
@@ -48,12 +52,32 @@ const DEFAULT_STATE: TMapExplorerState = {
   resetCounter: 0,
 };
 
+// Before v9 the defaults compensated for a weak climate model; anyone still on them gets the new ones.
+function isOldDefaultClimate(climate: Partial<TClimateControl> | undefined) {
+  return (
+    climate?.temperatureOffset === 0.2 &&
+    climate.temperatureContrast === 1.5 &&
+    climate.precipitationScale === 1.5 &&
+    climate.precipitationOffset === 0.3
+  );
+}
+
 export const useMapExplorerStore = create<TMapExplorerStore>()(
   persist(
     (set, get) => ({
       ...DEFAULT_STATE,
       setSeed(seed: string) {
         set({ seed, hoverIndex: null });
+      },
+      applyWorld({ seed, topography }) {
+        set({
+          seed,
+          topography,
+          seaLevel: DEFAULT_CONFIG.seaLevel,
+          nationCount: DEFAULT_CONFIG.nationCount,
+          cellCount: DEFAULT_CONFIG.cellCount,
+          hoverIndex: null,
+        });
       },
       setCellCount(cellCount: number) {
         set({ cellCount, hoverIndex: null });
@@ -117,8 +141,8 @@ export const useMapExplorerStore = create<TMapExplorerStore>()(
         climateControl: state.climateControl,
         displaySettings: state.displaySettings,
       }),
-      version: 8,
-      migrate: (persistedState) => {
+      version: 9,
+      migrate: (persistedState, version) => {
         const state = persistedState as Partial<TMapExplorerState> | undefined;
         if (!state) return DEFAULT_STATE;
         const persistedDisplaySettings = state.displaySettings as TDisplaySettings | undefined;
@@ -126,10 +150,44 @@ export const useMapExplorerStore = create<TMapExplorerStore>()(
           ...DEFAULT_STATE,
           ...state,
           topography: state.topography || DEFAULT_CONFIG.topography,
-          climateControl: { ...DEFAULT_CONFIG.climateControl, ...state.climateControl },
+          climateControl: {
+            ...DEFAULT_CONFIG.climateControl,
+            ...(version < 9 && isOldDefaultClimate(state.climateControl)
+              ? {}
+              : state.climateControl),
+          },
           displaySettings: { ...DEFAULT_CONFIG.displaySettings, ...persistedDisplaySettings },
         };
       },
     }
   )
 );
+
+// The very first visit has no saved UI state. Read it before anything writes to storage.
+function isFirstVisit() {
+  try {
+    const raw = window.localStorage.getItem('ui-state');
+    if (!raw) return true;
+    return (JSON.parse(raw) as { state?: { introSeen?: boolean } }).state?.introSeen !== true;
+  } catch {
+    return false;
+  }
+}
+
+// Runs once in the browser, before React renders: a shared link wins, a first-time visitor gets a
+// random world instead of the same default one, and everyone else keeps what they had.
+function applyInitialWorld() {
+  const store = useMapExplorerStore.getState();
+  const shared = parseWorldParams(window.location.search);
+  if (shared.seed) {
+    store.setSeed(shared.seed);
+    if (shared.topography) store.setTopography(shared.topography);
+    if (shared.seaLevel !== undefined) store.setSeaLevel(shared.seaLevel);
+    if (shared.nationCount !== undefined) store.setNationCount(shared.nationCount);
+    if (shared.cellCount !== undefined) store.setCellCount(shared.cellCount);
+    return;
+  }
+  if (isFirstVisit()) store.setSeed(generateRandomSeed());
+}
+
+if (typeof window !== 'undefined') applyInitialWorld();

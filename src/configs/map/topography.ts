@@ -1,9 +1,17 @@
 export const TOPOGRAPHY_CONFIG = {
   tectonic: {
-    boundaryInfluenceWidth: 0.12,
-    convergentUpliftScale: 0.35,
-    divergentRiftScale: 0.2,
-    subductionArcBoost: 1.6,
+    /** Half width of a mountain belt, as a share of the map diagonal. */
+    mountainHalfWidth: 0.05,
+    collisionWidthFactor: 1.6,
+    /** Relative plate speed that counts as full-strength collision or spreading. */
+    fullConvergenceRate: 0.01,
+    convergentAmplitude: 1,
+    collisionBoost: 1.3,
+    trenchDepth: 0.35,
+    riftDepth: 0.45,
+    ridgeAmplitude: 0.25,
+    chainBase: 0.55,
+    chainRange: 0.7,
     continentalElevationBias: 0.03,
     oceanicElevationBias: 0.06,
   },
@@ -39,11 +47,11 @@ export const TOPOGRAPHY_CONFIG = {
   blend: {
     macro: 0.3,
     secondary: 0.18,
-    ridged: 0.22,
+    ridged: 0.15,
     billow: 0.14,
     erosionMask: 0.12,
-    upliftField: 0.3,
-    tectonicUplift: 0.38,
+    upliftField: 0.15,
+    tectonicUplift: 0.6,
     coastNoise: 0.08,
     basinField: 0.26,
     tectonicRift: 0.24,
@@ -57,6 +65,59 @@ export const TOPOGRAPHY_CONFIG = {
     erosionRate: 0.2,
   },
 };
+
+/** How strongly each preset leans on plate collisions (uplift) and spreading (rift). */
+export const TECTONIC_PRESET_SCALE = {
+  balanced: { uplift: 1, rift: 1 },
+  ranges: { uplift: 1.5, rift: 0.8 },
+  rifted: { uplift: 0.9, rift: 1.8 },
+  archipelago: { uplift: 1, rift: 1 },
+  volcanic: { uplift: 1.1, rift: 0.9 },
+  continental: { uplift: 0.8, rift: 0.8 },
+} as const;
+
+/**
+ * Share of cells in the generated terrain that are land, per preset, at the default slider
+ * (a few points more than the final land share: erosion and inland lakes take some back). The
+ * generator moves the sea so every seed lands near this share; the slider then adds or removes
+ * land (`sliderSlope` of land share per unit of slider).
+ */
+export const LAND_FRACTION = {
+  target: {
+    balanced: 0.42,
+    continental: 0.5,
+    ranges: 0.46,
+    rifted: 0.38,
+    archipelago: 0.17,
+    volcanic: 0.34,
+  },
+  neutralSeaLevel: 0.5,
+  sliderSlope: 1,
+  min: 0.05,
+  max: 0.85,
+} as const;
+
+/** Where preset hotspots may sit: over a plate interior, away from every plate boundary. */
+export const TERRAIN_GUIDE = {
+  /** fraction of the map diagonal */
+  interiorMinDistance: 0.1,
+  maxInterior: 300,
+} as const;
+
+/**
+ * Sea floor profile, by distance from the nearest land (fraction of the map diagonal): a shallow
+ * shelf, a slope that drops away, then the deep basin. Depths are below sea level in elevation units
+ * (anything deeper than `TERRAIN_CLASSIFICATION_RULES.sea.deepSeaLevel` counts as deep water).
+ */
+export const SEA_FLOOR = {
+  shelfWidth: 0.022,
+  slopeWidth: 0.04,
+  shelfDepth: 0.07,
+  basinDepth: 0.3,
+  /** share of the old, noisy depth that survives, so the floor is not perfectly smooth */
+  keepNoise: 0.3,
+  minDepth: 0.005,
+} as const;
 
 export const TOPOGRAPHY_PRESET_CONFIG = {
   balanced: {
@@ -79,14 +140,14 @@ export const TOPOGRAPHY_PRESET_CONFIG = {
     smoothFactor: 0.18,
   },
   archipelago: {
-    majorIslandMin: 1,
-    majorIslandMax: 2,
-    mediumIslandBase: 4,
-    mediumIslandExtra: 3,
-    smallIslandBase: 16,
+    majorIslandMin: 3,
+    majorIslandMax: 5,
+    mediumIslandBase: 6,
+    mediumIslandExtra: 4,
+    smallIslandBase: 14,
     smallIslandExtra: 8,
-    valleyBands: { count: 7, depth: 0.1, width: 0.1 },
-    edgeShelfStrength: 0.3,
+    valleyBands: { count: 5, depth: 0.06, width: 0.08 },
+    edgeShelfStrength: 0.2,
     smoothFactor: 0.14,
   },
   volcanic: {

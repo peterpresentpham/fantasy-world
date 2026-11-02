@@ -30,7 +30,7 @@
 
 ### Determinism
 
-All randomness goes through `createSeededRandom(seed)` (`services/utils/math.ts`, FNV-1a hash plus LCG). Never call `Math.random()` in generation code. Loops and sort comparators have fixed tie-breaks, so the same seed and config give an identical world.
+All randomness goes through `createSeededRandom(seed)` (`services/utils/math.ts`, FNV-1a hash plus LCG). Never call `Math.random()` in generation code, and never shuffle with `sort(() => random() - 0.5)`: a random comparator is not a valid order, and Chrome's Maglev JIT sorted it differently from the interpreter, so the same seed gave different worlds (found through a flaky reload test). Use `shuffleSeeded` (`services/utils/math.ts`); `determinismGuard.test.ts` checks both rules. Loops and sort comparators have fixed tie-breaks, so the same seed and config give an identical world.
 
 ### Worker and cache
 
@@ -66,6 +66,8 @@ Use `useShallow` or single-field selectors. Persisted stores bump `version` and 
 - `MapToolbar` is a floating, draggable, collapsible bar: seed, topography, view presets (`configs/map/viewPresets.ts`), layers, 2D/Iso/3D, edit terrain, advanced settings.
 - `AdvancedSettings` expands under the toolbar with seven tabs: Generation, Display, Nations, Ethnic, Edit Terrain, Export, Palette.
 - `CellDetailPanel` is a side panel (a drawer below 1024px) showing nation or ethnic statistics. Its layout uses container queries so it follows the panel width.
+- `MapLegend` explains the colours of the active view (built by `services/utils/legend.ts` from what is on the map). `IntroHero` introduces the app on the first visit.
+- The world is shareable: `services/utils/worldUrl.ts` turns the seed and non-default settings into a query string (`?seed=…&topo=…&sea=…&nations=…&cells=…`), `useWorldUrlSync` keeps the address bar current, and `mapExplorerStore` reads the link at load. A first-time visitor with no link gets a random seed. The toolbar can copy the link and download the map as a PNG.
 - Shortcuts are defined in `services/utils/hotkeys.ts` and wired by `useMapHotkeys`.
 - Colours come from theme tokens in `src/styles/globals.css`; avoid raw Tailwind palette colours.
 

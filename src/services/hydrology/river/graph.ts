@@ -1,5 +1,6 @@
 import { RIVER_CONFIG } from 'src/configs/map/hydrology';
 import { TCell, TPoint, TRiver, TRiverEndType } from 'src/types/global';
+import { collectConnectedComponents } from 'src/services/utils/graph';
 import { createSeededRandom } from 'src/services/utils/math';
 import { T_COAST_OUTLET } from './flow';
 import { createRiverName, outletEndType, riverKind } from './helpers';
@@ -9,6 +10,28 @@ type TConfluenceEvent = {
   mainRiverId: number;
   tributaryRiverId: number;
 };
+
+/**
+ * A small island drains few cells, so it can never gather the flow a continent does. Its flow
+ * threshold is lowered with its size, down to `RIVER_CONFIG.island.minScale`.
+ */
+function buildIslandThresholdScale(cells: TCell[]) {
+  const scale = new Float32Array(cells.length).fill(1);
+  const reference = cells.length * RIVER_CONFIG.island.referenceShare;
+  const landmasses = collectConnectedComponents(
+    cells,
+    (cell) => !cell.isWater,
+    (_current, neighbor) => !neighbor.isWater
+  );
+  for (const landmass of landmasses) {
+    const value = Math.max(
+      RIVER_CONFIG.island.minScale,
+      Math.min(1, Math.sqrt(landmass.length / reference))
+    );
+    for (const id of landmass) scale[id] = value;
+  }
+  return scale;
+}
 
 export function buildRiverGraph(
   cells: TCell[],
@@ -20,6 +43,7 @@ export function buildRiverGraph(
   const threshold =
     RIVER_CONFIG.minFluxToFormRiver *
     Math.pow(cells.length / 10000, RIVER_CONFIG.cellsNumberModifierExp);
+  const islandScale = buildIslandThresholdScale(cells);
   const riverByCell = new Int32Array(cells.length);
   riverByCell.fill(-1);
   const riversRaw = new Map<number, number[]>();
@@ -39,10 +63,11 @@ export function buildRiverGraph(
       const cell = cells[cellIndex];
       if (cell.isWater) return false;
       if (!(downstream[cellIndex] >= 0 || downstream[cellIndex] === T_COAST_OUTLET)) return false;
-      const aridity = cells[cellIndex].aridityIndex ?? 0;
+      // aridityIndex is precipitation over evaporation: high means wet, so dry cells need more flow.
+      const humidity = cells[cellIndex].aridityIndex ?? 0;
       const aridityMultiplier =
-        aridity > 1.5 ? 4.0 : aridity > 1.0 ? 2.5 : aridity > 0.7 ? 1.5 : 1.0;
-      const effectiveThreshold = threshold * aridityMultiplier;
+        humidity < 0.2 ? 4.0 : humidity < 0.35 ? 2.5 : humidity < 0.5 ? 1.5 : 1.0;
+      const effectiveThreshold = threshold * aridityMultiplier * islandScale[cellIndex];
       if (flow[cellIndex] < effectiveThreshold) return false;
       return upstreamCount[cellIndex] <= 1 || flow[cellIndex] >= effectiveThreshold * 1.4;
     })
@@ -98,12 +123,21 @@ export function buildRiverGraph(
   const rivers: TRiver[] = [];
   const riverWidthByCell = new Float32Array(cells.length);
 
-  for (const [riverId, chain] of riversRaw.entries()) {
-    const sourceCell = cells[chain[0] as number];
-    const sourceAridity = sourceCell?.aridityIndex ?? 0;
+  // A river that is too short is dropped, unless a kept river flows into it: that tributary
+  // would otherwise end on a cell that is no longer a river. Tributaries always have a higher id
+  // than the river they join, so going from the last id down settles each river after its children.
+  const keptRivers = new Set<number>();
+  for (const riverId of [...riversRaw.keys()].sort((a, b) => b - a)) {
+    const chain = riversRaw.get(riverId) as number[];
+    const sourceHumidity = cells[chain[0] as number]?.aridityIndex ?? 0;
     const minCells =
-      sourceAridity > 1.0 ? RIVER_CONFIG.minRiverCells * 2 : RIVER_CONFIG.minRiverCells;
-    if (chain.length < minCells) {
+      sourceHumidity < 0.35 ? RIVER_CONFIG.minRiverCells * 2 : RIVER_CONFIG.minRiverCells;
+    const hasKeptTributary = [...(tributaries.get(riverId) ?? [])].some((id) => keptRivers.has(id));
+    if (chain.length >= minCells || hasKeptTributary) keptRivers.add(riverId);
+  }
+
+  for (const [riverId, chain] of riversRaw.entries()) {
+    if (!keptRivers.has(riverId)) {
       for (const cellId of chain) riverByCell[cellId] = -1;
       continue;
     }

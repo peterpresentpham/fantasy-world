@@ -7,6 +7,7 @@ import {
   TGeopoliticsParams,
 } from 'src/types/global';
 import { pickEconomicAndCapital } from './capitals';
+import { keepCitiesWhole } from './cities';
 import { buildEthnicRegions } from './ethnic';
 import {
   alignNaturalTerrainClusters,
@@ -24,8 +25,9 @@ import {
 } from './provinces/index';
 import { assignMaritimeZones, getNationCount, isLand, limitMountainSplit } from './shared';
 
-const T_NATION_POPULATION_MULTIPLIER_RANGE: [number, number] = [0.1, 5.0];
-const T_NATION_ECONOMY_MULTIPLIER_RANGE: [number, number] = [0.1, 20];
+// A nation's size and wealth come from its land. Only a small spread is left so equal land is not identical.
+const T_NATION_POPULATION_MULTIPLIER_RANGE: [number, number] = [0.85, 1.15];
+const T_NATION_ECONOMY_MULTIPLIER_RANGE: [number, number] = [0.8, 1.25];
 const T_MIN_NATION_POPULATION = 500;
 
 type TNationAssignment = {
@@ -200,6 +202,8 @@ function assignNations(mesh: TDelaunayMesh, seed: string, nationCount: number): 
   const targetNationCount = getNationCount(nationCount, landCellCount);
   const preserveNationCount = targetNationCount;
   const owner = buildLandNations(mesh.cells, seed, nationCount);
+  // No border through a city; the clean-up passes that follow repair anything this leaves broken.
+  keepCitiesWhole(mesh.cells, owner);
   return { owner, preserveNationCount };
 }
 
@@ -235,7 +239,7 @@ function finalizeOwnershipProjection(
   ethnics: TEthnic[],
   seed: string
 ) {
-  const { waterOwner, zoneType } = assignMaritimeZones(mesh.cells);
+  const { waterOwner, zoneType } = assignMaritimeZones(mesh.cells, owner, mesh.width, mesh.height);
   const nations = pickEconomicAndCapital(
     mesh.cells,
     owner,
@@ -280,7 +284,16 @@ function finalizeOwnershipProjection(
 }
 
 export function buildGeopolitics(params: TGeopoliticsParams): TDelaunayMesh {
-  const { mesh, seed, nationCount } = params;
+  const { seed, nationCount } = params;
+  // Peoples first: geography decides them, nations are drawn over them afterwards.
+  const { ethnicOwner, ethnics } = buildEthnicRegions(params.mesh.cells, seed, nationCount);
+  const mesh = {
+    ...params.mesh,
+    cells: params.mesh.cells.map((cell) => ({
+      ...cell,
+      ethnicId: ethnicOwner[cell.id] >= 0 ? ethnicOwner[cell.id] : null,
+    })),
+  };
   const { owner, preserveNationCount } = assignNations(mesh, seed, nationCount);
   postProcessNations(mesh.cells, owner, preserveNationCount, seed);
   const nationProfiles = buildNationProfiles(owner, seed);
@@ -289,7 +302,6 @@ export function buildGeopolitics(params: TGeopoliticsParams): TDelaunayMesh {
   const scaledMesh = { ...mesh, cells: normalizedCells };
   const { provinceOwner } = assignProvinces(scaledMesh.cells, owner, seed);
   postProcessProvinces({ cells: scaledMesh.cells, owner, provinceOwner });
-  const { ethnicOwner, ethnics } = buildEthnicRegions(scaledMesh.cells, owner, seed);
   return finalizeOwnershipProjection(
     scaledMesh,
     nationProfiles,

@@ -10,10 +10,11 @@ export default function MapViewportMinimap() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const viewport = useViewportStore((s) => s.viewport);
   const frameSize = useViewportStore((s) => s.frameSize);
+  const layerSize = useViewportStore((s) => s.layerSize);
   const renderTick = useViewportStore((s) => s.renderTick);
   const centerOn = useViewportStore((s) => s.centerOn);
-  const height = Math.round((MINIMAP_WIDTH * frameSize.height) / Math.max(1, frameSize.width));
-  const view = visibleFraction(viewport, frameSize);
+  const height = Math.round((MINIMAP_WIDTH * layerSize.height) / Math.max(1, layerSize.width));
+  const view = visibleFraction(viewport, layerSize, frameSize);
 
   // Copy of the already rendered base canvas, refreshed whenever it is redrawn.
   useEffect(() => {

@@ -155,8 +155,11 @@ export default function MapCanvasStage({ pan }: TProps) {
 
   return (
     <div
-      className="absolute inset-0 origin-top-left"
+      className="absolute top-0 left-0 origin-top-left"
       style={{
+        // Covers the frame while keeping the map's aspect ratio; the frame is a size container.
+        width: `max(100cqw, calc(100cqh * ${width / height}))`,
+        aspectRatio: `${width} / ${height}`,
         transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.scale})`,
       }}
     >

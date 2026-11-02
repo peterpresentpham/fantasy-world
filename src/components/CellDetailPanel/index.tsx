@@ -1,10 +1,11 @@
 'use client';
 
-import { XIcon } from 'lucide-react';
+import { ChevronDown, ChevronUp, XIcon } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { Button } from 'src/components/ui/button';
 import { ButtonGroup } from 'src/components/ui/button-group';
 import { useMapContext } from 'src/contexts/map.context';
+import useIsMobile from 'src/hooks/useIsMobile';
 import { useUiStore } from 'src/store/uiStore';
 import useEthnicStatistic from 'src/hooks/useEthnicStatistic';
 import useNationStatistic from 'src/hooks/useNationStatistic';
@@ -27,17 +28,24 @@ export default function CellDetailPanel() {
   const { nation, data: nationData } = useNationStatistic(selectedNationId, mesh);
   const { data: ethnicData } = useEthnicStatistic(selectedEthnicId, mesh);
   const [view, setView] = useState<TView>('nation');
+  // On a phone the panel opens as a peek (header only) so the map stays visible; tap to expand.
+  const isMobile = useIsMobile();
+  const expanded = useUiStore((s) => s.detailExpanded);
+  const setExpanded = useUiStore((s) => s.setDetailExpanded);
+  const showBody = !isMobile || expanded;
 
   const hasNation = nation !== undefined && nationData !== undefined;
   const hasEthnic = ethnicData !== undefined;
 
   useEffect(() => {
     setSelectedNationId(nationId);
-  }, [nationId]);
+    setExpanded(false);
+  }, [nationId, setExpanded]);
 
   useEffect(() => {
     setSelectedEthnicId(ethnicId);
-  }, [ethnicId]);
+    setExpanded(false);
+  }, [ethnicId, setExpanded]);
 
   useEffect(() => {
     if (!hasNation && hasEthnic) {
@@ -59,7 +67,7 @@ export default function CellDetailPanel() {
   return (
     <aside
       aria-label={view === 'nation' ? 'Nation details' : 'Ethnic group details'}
-      className="fantasy-glass-strong animate-in slide-in-from-right fixed inset-y-0 right-0 z-40 flex w-full max-w-md flex-col border-l shadow-2xl duration-200 sm:w-[28rem] lg:static lg:z-auto lg:shrink-0 lg:shadow-none"
+      className="fantasy-glass-strong animate-in slide-in-from-bottom sm:slide-in-from-right fixed inset-x-0 bottom-0 z-40 flex max-h-[60dvh] w-full flex-col rounded-t-2xl border-t shadow-2xl duration-200 sm:inset-y-0 sm:right-0 sm:left-auto sm:max-h-none sm:w-[28rem] sm:max-w-md sm:rounded-none sm:border-t-0 sm:border-l lg:static lg:z-auto lg:shrink-0 lg:shadow-none"
     >
       <div className="flex min-h-0 flex-1 flex-col">
         {/* Header */}
@@ -107,6 +115,18 @@ export default function CellDetailPanel() {
                 ))}
               </ButtonGroup>
             )}
+            {isMobile && (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                aria-label={expanded ? 'Show less' : 'Show more'}
+                aria-expanded={expanded}
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? <ChevronDown /> : <ChevronUp />}
+              </Button>
+            )}
             <Button
               type="button"
               variant="ghost"
@@ -119,12 +139,14 @@ export default function CellDetailPanel() {
           </div>
         </div>
 
-        <div className="@container flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 text-sm md:p-6">
-          {view === 'nation' && nationData && nation && (
-            <NationDetail nation={nation} data={nationData} mesh={mesh} />
-          )}
-          {view === 'ethnic' && ethnicData && <EthnicDetail data={ethnicData} mesh={mesh} />}
-        </div>
+        {showBody && (
+          <div className="@container flex-1 space-y-4 overflow-x-hidden overflow-y-auto p-4 text-sm md:p-6">
+            {view === 'nation' && nationData && nation && (
+              <NationDetail nation={nation} data={nationData} mesh={mesh} />
+            )}
+            {view === 'ethnic' && ethnicData && <EthnicDetail data={ethnicData} mesh={mesh} />}
+          </div>
+        )}
       </div>
     </aside>
   );

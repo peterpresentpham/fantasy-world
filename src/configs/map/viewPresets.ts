@@ -31,24 +31,48 @@ export type TViewPresetId =
 export type TViewPreset = {
   id: TViewPresetId;
   label: string;
+  /** one plain-language line for the tooltip and the legend */
+  description: string;
   layers: readonly (typeof PRESET_MANAGED_LAYERS)[number][];
 };
 
 export const VIEW_PRESETS: readonly TViewPreset[] = [
-  { id: 'landform', label: 'Landform', layers: ['landform', 'landformRelief'] },
-  { id: 'biome', label: 'Biome', layers: ['biomeRelief'] },
+  {
+    id: 'landform',
+    label: 'Landform',
+    description: 'Mountains, hills, plains and valleys',
+    layers: ['landform', 'landformRelief'],
+  },
+  {
+    id: 'biome',
+    label: 'Biome',
+    description: 'Forests, deserts and other climate zones',
+    layers: ['biomeRelief'],
+  },
   {
     id: 'political',
     label: 'Political',
+    description: 'Nations and their borders',
     layers: ['biomeRelief', 'nationBorders', 'nationFill', 'provinceBorders'],
   },
   {
     id: 'ethnic',
     label: 'Ethnic',
+    description: 'Where each people lives',
     layers: ['biomeRelief', 'ethnicBorders', 'ethnicFill', 'ethnicLabels'],
   },
-  { id: 'climate', label: 'Climate', layers: ['temperature'] },
-  { id: 'population', label: 'Population', layers: ['population'] },
+  {
+    id: 'climate',
+    label: 'Climate',
+    description: 'Temperature from cold to hot',
+    layers: ['temperature'],
+  },
+  {
+    id: 'population',
+    label: 'Population',
+    description: 'How many people live where',
+    layers: ['population'],
+  },
 ];
 
 export type TViewMode = '2d' | 'iso' | '3d';

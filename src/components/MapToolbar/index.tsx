@@ -12,18 +12,29 @@ import { useRef } from 'react';
 import AdvancedSettings from 'src/components/AdvancedSettings';
 import { Button } from 'src/components/ui/button';
 import useDragPosition from 'src/hooks/useDragPosition';
+import useApplyTheme from 'src/hooks/useApplyTheme';
 import useHasMounted from 'src/hooks/useHasMounted';
+import useIsMobile from 'src/hooks/useIsMobile';
 import useMapHotkeys from 'src/hooks/useMapHotkeys';
+import useWorldUrlSync from 'src/hooks/useWorldUrlSync';
 import { cn } from 'src/lib/utils';
 import { useUiStore } from 'src/store/uiStore';
 import LayerQuickToggles from './LayerQuickToggles';
+import MobileToolbar from './MobileToolbar';
+import RouteButton from './RouteButton';
+import SampleWorldsSelect from './SampleWorldsSelect';
 import SeedQuickControl from './SeedQuickControl';
 import TopographyQuickSelect from './TopographyQuickSelect';
+import ShareButtons from './ShareButtons';
+import ThemeToggle from './ThemeToggle';
 import ViewModeSwitch from './ViewModeSwitch';
 
 export default function MapToolbar() {
   const mounted = useHasMounted();
+  const isMobile = useIsMobile();
   useMapHotkeys();
+  useApplyTheme();
+  useWorldUrlSync();
   const rootRef = useRef<HTMLDivElement | null>(null);
   const openConfig = useUiStore((s) => s.openConfig);
   const configOpen = useUiStore((s) => s.configOpen);
@@ -35,6 +46,7 @@ export default function MapToolbar() {
   const setPosition = useUiStore((s) => s.setToolbarPosition);
   const dragHandlers = useDragPosition({ elementRef: rootRef, position, onChange: setPosition });
   if (!mounted) return null;
+  if (isMobile) return <MobileToolbar />;
 
   const advancedOpen = configOpen && !collapsed;
 
@@ -62,8 +74,10 @@ export default function MapToolbar() {
           <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-2">
             <SeedQuickControl />
             <TopographyQuickSelect />
+            <SampleWorldsSelect />
             <LayerQuickToggles />
             <ViewModeSwitch />
+            <RouteButton />
             <Button
               type="button"
               variant="secondary"
@@ -88,6 +102,9 @@ export default function MapToolbar() {
             </Button>
           </div>
         )}
+
+        {!collapsed && <ShareButtons />}
+        {!collapsed && <ThemeToggle />}
 
         <Button
           type="button"

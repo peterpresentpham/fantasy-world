@@ -33,16 +33,24 @@ export async function skipIntro(page: Page) {
   });
 }
 
-export async function openApp(page: Page, options: { intro?: boolean } = {}) {
+export async function openApp(page: Page, options: { intro?: boolean; path?: string } = {}) {
   if (!options.intro) await skipIntro(page);
-  await page.goto('/');
+  await page.goto(options.path ?? '/');
   await waitForMap(page);
 }
 
 export const advancedPanel = (page: Page) =>
   page.getByRole('region', { name: 'Advanced settings', exact: true });
 
+/** On phones most tools live in a bottom sheet behind the "Tools" button; open it if needed. */
+export async function openTools(page: Page) {
+  const tools = page.getByRole('button', { name: 'Tools', exact: true });
+  if ((await tools.count()) === 0) return;
+  if ((await tools.getAttribute('aria-expanded')) !== 'true') await tools.click();
+}
+
 export async function openConfig(page: Page) {
+  await openTools(page);
   await page.getByRole('button', { name: 'Advanced settings', exact: true }).click();
   await expect(advancedPanel(page)).toBeVisible();
 }
@@ -60,7 +68,7 @@ export async function applySeed(page: Page, seed: string) {
   await openTab(page, 'Generation');
   const before = await canvasFingerprint(page);
   await page.getByPlaceholder('world000').fill(seed);
-  await page.getByRole('button', { name: 'Apply seed' }).click();
+  await page.getByRole('button', { name: 'Use this seed' }).click();
   await expect.poll(() => canvasFingerprint(page)).not.toBe(before);
   await waitForMap(page);
 }

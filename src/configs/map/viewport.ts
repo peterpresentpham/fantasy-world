@@ -6,3 +6,8 @@ export const WHEEL_ZOOM_SENSITIVITY = 0.0015;
 export const STEP_ZOOM_FACTOR = 1.25;
 /** pointer travel (px) before a press becomes a pan instead of a click */
 export const DRAG_THRESHOLD_PX = 4;
+
+/** Zoom from which the thinnest river stretches are drawn. */
+export const MINOR_RIVER_ZOOM = 1.5;
+/** River stretches thinner than this are hidden until `MINOR_RIVER_ZOOM`. */
+export const MINOR_RIVER_WIDTH = 0.6;

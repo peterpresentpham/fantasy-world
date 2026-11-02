@@ -25,7 +25,7 @@ export default function SeedPanel() {
   }
 
   return (
-    <BlurCard title="Seed">
+    <BlurCard title="Seed (the code that makes a world)">
       <Input
         value={seedDraft}
         onChange={(event) => setSeedDraft(event.target.value)}
@@ -33,7 +33,7 @@ export default function SeedPanel() {
       />
       <div className="mt-2 flex gap-2">
         <Button type="button" variant="secondary" size="lg" onClick={applySeed}>
-          Apply seed
+          Use this seed
         </Button>
         <Button type="button" variant="outline" size="lg" onClick={applyRandomSeed}>
           Randomize

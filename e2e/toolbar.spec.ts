@@ -5,6 +5,7 @@ import {
   openApp,
   settledFingerprint,
   watchErrors,
+  openTools,
 } from './lib/game';
 
 test('toolbar is shown with seed, preset, view and overlay controls', async ({ page }) => {
@@ -14,7 +15,8 @@ test('toolbar is shown with seed, preset, view and overlay controls', async ({ p
   await expect(toolbar).toBeVisible();
   await expect(toolbar.getByLabel('Seed', { exact: true })).toBeVisible();
   await expect(toolbar.getByRole('button', { name: 'Randomize seed' })).toBeVisible();
-  await expect(toolbar.getByRole('group', { name: 'View mode' })).toBeVisible();
+  await openTools(page);
+  await expect(page.getByRole('group', { name: 'View mode' })).toBeVisible();
   expect(errors).toEqual([]);
 });
 
@@ -61,6 +63,7 @@ test('view presets switch exclusively and change the map', async ({ page }) => {
 
 test('view mode switch is exclusive', async ({ page }) => {
   await openApp(page);
+  await openTools(page);
   const group = page.getByRole('group', { name: 'View mode' });
   await group.getByRole('button', { name: 'Iso' }).click();
   await expect(group.getByRole('button', { name: 'Iso' })).toHaveAttribute('aria-pressed', 'true');
@@ -73,6 +76,7 @@ test('edit terrain shortcut opens the advanced settings on the Edit Terrain tab'
   page,
 }) => {
   await openApp(page);
+  await openTools(page);
   await page.getByRole('button', { name: 'Edit terrain' }).click();
   await expect(advancedPanel(page)).toBeVisible();
   await expect(page.getByRole('tab', { name: 'Edit Terrain' })).toHaveAttribute(
@@ -81,7 +85,8 @@ test('edit terrain shortcut opens the advanced settings on the Edit Terrain tab'
   );
 });
 
-test('toolbar collapses to a small bar and expands again', async ({ page }) => {
+test('toolbar collapses to a small bar and expands again', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'phones use the bottom sheet toolbar');
   await openApp(page);
   const toolbar = page.getByRole('toolbar', { name: 'Map tools' });
   const before = await toolbar.boundingBox();
@@ -102,7 +107,11 @@ test('toolbar collapses to a small bar and expands again', async ({ page }) => {
   ).toBeVisible();
 });
 
-test('toolbar can be dragged while collapsed and stays inside the screen', async ({ page }) => {
+test('toolbar can be dragged while collapsed and stays inside the screen', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'phones use the bottom sheet toolbar');
   await openApp(page);
   const toolbar = page.getByRole('toolbar', { name: 'Map tools' });
   await toolbar.getByRole('button', { name: 'Collapse toolbar' }).click();
@@ -137,7 +146,11 @@ test('toolbar can be dragged while collapsed and stays inside the screen', async
   expect(Math.abs(after.y - clamped.y)).toBeLessThanOrEqual(2);
 });
 
-test('advanced settings expand under the toolbar and the map stays usable', async ({ page }) => {
+test('advanced settings expand under the toolbar and the map stays usable', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(isMobile, 'phones use the bottom sheet toolbar');
   const errors = watchErrors(page);
   await openApp(page);
   const toolbar = page.getByRole('toolbar', { name: 'Map tools' });
@@ -164,9 +177,12 @@ test('advanced settings expand under the toolbar and the map stays usable', asyn
 
 test('collapsing the toolbar hides the advanced settings and expanding brings them back', async ({
   page,
+  isMobile,
 }) => {
+  test.skip(isMobile, 'phones use the bottom sheet toolbar');
   await openApp(page);
   const toolbar = page.getByRole('toolbar', { name: 'Map tools' });
+  await openTools(page);
   await toolbar.getByRole('button', { name: 'Advanced settings', exact: true }).click();
   await expect(advancedPanel(page)).toBeVisible();
 
@@ -180,6 +196,23 @@ test('collapsing the toolbar hides the advanced settings and expanding brings th
 test('the floating settings button and modal dialog are gone', async ({ page }) => {
   await openApp(page);
   await expect(page.getByRole('button', { name: 'Map configuration' })).toHaveCount(0);
+  await openTools(page);
   await page.getByRole('button', { name: 'Advanced settings', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+});
+
+test('the theme button switches to parchment and the choice survives a reload', async ({
+  page,
+}) => {
+  await openApp(page);
+  await openTools(page);
+  const html = page.locator('html');
+  await page.getByRole('button', { name: 'Switch to parchment theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'parchment');
+
+  await page.reload();
+  await expect(html).toHaveAttribute('data-theme', 'parchment');
+  await openTools(page);
+  await page.getByRole('button', { name: 'Switch to dark theme' }).click();
+  await expect(html).toHaveAttribute('data-theme', 'dark');
 });

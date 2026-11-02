@@ -1,4 +1,16 @@
 export const BIOME_THRESHOLDS = {
+  /** Temperature zone limits (0 = coldest, 1 = hottest) and wetland conditions for the biome lookup. */
+  whittaker: {
+    iceMaxTemp: 0.1,
+    polarMaxTemp: 0.2,
+    coldMaxTemp: 0.36,
+    coolMaxTemp: 0.55,
+    warmMaxTemp: 0.72,
+    mountainTundraMaxTemp: 0.22,
+    wetlandMinAridity: 1.0,
+    wetlandMinPrecip: 0.55,
+    wetlandMinFlow: 0.5,
+  },
   desert: {
     hotTempMin: 0.62,
     hotAridityMax: 0.32,

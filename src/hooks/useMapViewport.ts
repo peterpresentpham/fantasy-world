@@ -2,10 +2,13 @@
 
 import { PointerEvent, RefObject, useCallback, useEffect, useRef } from 'react';
 import { DRAG_THRESHOLD_PX, WHEEL_ZOOM_SENSITIVITY } from 'src/configs/map/viewport';
+import { coverLayerSize } from 'src/services/utils/viewport';
 import { useViewportStore } from 'src/store/viewportStore';
 
 type TProps = {
   frameRef: RefObject<HTMLElement | null>;
+  /** width / height of the map; the layer keeps it and covers the frame */
+  aspect: number;
   /** wheel zoom; off in 3D mode where the 3D controls own the wheel */
   zoomEnabled: boolean;
   /** drag pan / pinch; off while a tool owns the pointer (terrain painting) */
@@ -19,7 +22,7 @@ type TPointer = { x: number; y: number };
  * the gesture is a pan/pinch, so the caller can skip hover/paint; `consumeDrag()` tells a click
  * handler that the press it is about to handle was really a drag.
  */
-export default function useMapViewport({ frameRef, zoomEnabled, panEnabled }: TProps) {
+export default function useMapViewport({ frameRef, aspect, zoomEnabled, panEnabled }: TProps) {
   const pointers = useRef(new Map<number, TPointer>());
   const startRef = useRef<TPointer | null>(null);
   const gestureRef = useRef(false);
@@ -31,7 +34,8 @@ export default function useMapViewport({ frameRef, zoomEnabled, panEnabled }: TP
 
     const publishSize = () => {
       const rect = frame.getBoundingClientRect();
-      useViewportStore.getState().setFrameSize({ width: rect.width, height: rect.height });
+      const frameSize = { width: rect.width, height: rect.height };
+      useViewportStore.getState().setSizes(frameSize, coverLayerSize(frameSize, aspect));
     };
     publishSize();
     const observer = new ResizeObserver(publishSize);
@@ -49,7 +53,7 @@ export default function useMapViewport({ frameRef, zoomEnabled, panEnabled }: TP
       observer.disconnect();
       frame.removeEventListener('wheel', onWheel);
     };
-  }, [frameRef, zoomEnabled]);
+  }, [frameRef, aspect, zoomEnabled]);
 
   const onPointerDown = useCallback(
     (event: PointerEvent<HTMLElement>) => {
@@ -88,7 +92,9 @@ export default function useMapViewport({ frameRef, zoomEnabled, panEnabled }: TP
       }
 
       pointers.current.set(event.pointerId, current);
-      if (store.viewport.scale <= 1 || (event.buttons & 1) === 0) return false;
+      const overflows =
+        store.viewport.scale > 1 || store.layerSize.width > store.frameSize.width + 1;
+      if (!overflows || (event.buttons & 1) === 0) return false;
       const start = startRef.current;
       if (!gestureRef.current && start) {
         if (Math.hypot(current.x - start.x, current.y - start.y) < DRAG_THRESHOLD_PX) return false;

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { clamp, createSeededRandom, hashSeed, normalize, smoothStep, tentScore } from './math';
+import {
+  clamp,
+  createSeededRandom,
+  hashSeed,
+  normalize,
+  shuffleSeeded,
+  smoothStep,
+  tentScore,
+} from './math';
 
 describe('clamp', () => {
   it('limits values to the range', () => {
@@ -66,5 +74,21 @@ describe('createSeededRandom', () => {
   it('respects a custom max', () => {
     const next = createSeededRandom('seed', 4294967296 * 10);
     for (let i = 0; i < 50; i += 1) expect(next()).toBeLessThan(0.1 + 1e-9);
+  });
+});
+
+describe('shuffleSeeded', () => {
+  it('returns a permutation and leaves the input alone', () => {
+    const input = [1, 2, 3, 4, 5, 6, 7, 8];
+    const result = shuffleSeeded(input, createSeededRandom('shuffle'));
+    expect([...result].sort((a, b) => a - b)).toEqual(input);
+    expect(input).toEqual([1, 2, 3, 4, 5, 6, 7, 8]);
+  });
+
+  it('is the same for the same seed and differs between seeds', () => {
+    const input = Array.from({ length: 20 }, (_, i) => i);
+    const a = shuffleSeeded(input, createSeededRandom('one'));
+    expect(shuffleSeeded(input, createSeededRandom('one'))).toEqual(a);
+    expect(shuffleSeeded(input, createSeededRandom('two'))).not.toEqual(a);
   });
 });

@@ -3,18 +3,26 @@
 import { Minus, Plus, ScanSearch } from 'lucide-react';
 import { Button } from 'src/components/ui/button';
 import { ButtonGroup } from 'src/components/ui/button-group';
+import useSheetAvoidance from 'src/hooks/useSheetAvoidance';
 import { MAX_ZOOM } from 'src/configs/map/viewport';
 import { useViewportStore } from 'src/store/viewportStore';
 import MapViewportMinimap from './MapViewportMinimap';
 
 export default function MapViewControls() {
+  const avoidSheet = useSheetAvoidance();
   const scale = useViewportStore((s) => s.viewport.scale);
+  const frameSize = useViewportStore((s) => s.frameSize);
+  const layerSize = useViewportStore((s) => s.layerSize);
+  // The map overflows the frame when zoomed, or when it covers a tall frame.
+  const overflows = scale > 1 || layerSize.width > frameSize.width + 1;
   const zoomStep = useViewportStore((s) => s.zoomStep);
   const reset = useViewportStore((s) => s.reset);
 
   return (
-    <div className="pointer-events-none absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2">
-      {scale > 1 && <MapViewportMinimap />}
+    <div
+      className={`pointer-events-none absolute bottom-3 left-3 z-10 flex flex-col items-start gap-2 ${avoidSheet}`}
+    >
+      {overflows && <MapViewportMinimap />}
       <ButtonGroup
         aria-label="Zoom"
         className="fantasy-glass-strong pointer-events-auto rounded-lg p-1"

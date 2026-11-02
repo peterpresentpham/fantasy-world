@@ -1,4 +1,5 @@
 import { LANDFORM_CONFIG } from 'src/configs/map/landform-biome';
+import { MINOR_RIVER_WIDTH } from 'src/configs/map/viewport';
 import { getRiverStrokeWidth } from 'src/services/utils';
 import { TCell, TCellStats, TDisplaySettings } from 'src/types/global';
 import {
@@ -203,11 +204,13 @@ export function renderLandCells(
   }
 }
 
-export function renderRivers(context: CanvasRenderingContext2D, cells: TCell[]) {
+/** `showMinor` false leaves out the thin headwater stretches, so a zoomed-out map stays readable. */
+export function renderRivers(context: CanvasRenderingContext2D, cells: TCell[], showMinor = true) {
   context.lineCap = 'round';
 
   for (const cell of cells) {
     if (!cell.isRiver || cell.downstreamId === null) continue;
+    if (!showMinor && cell.riverWidth < MINOR_RIVER_WIDTH) continue;
     const downstreamCell = cells[cell.downstreamId];
     if (!downstreamCell) continue;
 

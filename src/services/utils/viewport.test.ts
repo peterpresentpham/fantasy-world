@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   centerViewportOn,
   clampViewport,
+  coverLayerSize,
   IDENTITY_VIEWPORT,
   panViewport,
+  restViewport,
   visibleFraction,
   zoomViewportAt,
 } from './viewport';
@@ -76,5 +78,53 @@ describe('panViewport / centerViewportOn / visibleFraction', () => {
       width: 1,
       height: 1,
     });
+  });
+});
+
+describe('a map layer that covers a taller frame', () => {
+  const frame = { width: 400, height: 800 };
+  const layer = coverLayerSize(frame, 1.6);
+
+  it('keeps the map aspect ratio and covers the frame', () => {
+    expect(layer.height).toBe(800);
+    expect(layer.width).toBeCloseTo(1280);
+    expect(layer.width / layer.height).toBeCloseTo(1.6);
+  });
+
+  it('equals the frame when the frame already has the map aspect ratio', () => {
+    expect(coverLayerSize({ width: 800, height: 500 }, 1.6)).toEqual({ width: 800, height: 500 });
+  });
+
+  it('is centred at rest and can be panned to both edges but no further', () => {
+    const rest = restViewport(layer, frame);
+    expect(rest).toEqual({ scale: 1, x: -440, y: 0 });
+    expect(panViewport(rest, 1e6, 0, layer, limits, frame).x).toBe(0);
+    expect(panViewport(rest, -1e6, 0, layer, limits, frame).x).toBe(-880);
+  });
+
+  it('reports the visible share of the layer', () => {
+    const view = visibleFraction(restViewport(layer, frame), layer, frame);
+    expect(view.left).toBeCloseTo(440 / 1280);
+    expect(view.width).toBeCloseTo(400 / 1280);
+    expect(view.height).toBe(1);
+  });
+
+  it('keeps the point under the anchor fixed while zooming', () => {
+    const rest = restViewport(layer, frame);
+    const anchor = { x: 200, y: 400 };
+    const before = (anchor.x - rest.x) / rest.scale;
+    const zoomed = zoomViewportAt(rest, anchor, 2, layer, limits, frame);
+    expect((anchor.x - zoomed.x) / zoomed.scale).toBeCloseTo(before);
+  });
+
+  it('centres on a point of the layer', () => {
+    const view = centerViewportOn(
+      restViewport(layer, frame),
+      { x: 0.5, y: 0.5 },
+      layer,
+      limits,
+      frame
+    );
+    expect(view.x).toBeCloseTo(-440);
   });
 });

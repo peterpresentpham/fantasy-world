@@ -27,7 +27,7 @@ export const LAKE_CONFIG = {
 };
 
 export const PRECIPITATION_CONFIG = {
-  baseWeights: { water: 0.56, latitude: 1.0 },
+  baseWeights: { water: 0.3, advectedMoisture: 0.4, latitude: 1.0 },
   orographicSimple: { elevationStart: 0.6, weight: 0.25, maxBonus: 0.25 },
   wind: {
     tradeLatMax: 0.23,
@@ -56,7 +56,7 @@ export const PRECIPITATION_CONFIG = {
 };
 
 export const RIVER_CONFIG = {
-  minFluxToFormRiver: 80,
+  minFluxToFormRiver: 55,
   landWaterThreshold: 0.2,
   /** Upstream cells needed before a cell counts as a river for biome classification (rivers are traced later). */
   earlyMaskCatchment: 10,
@@ -65,6 +65,8 @@ export const RIVER_CONFIG = {
   width: { fluxFactor: 500, maxFluxWidth: 1, lengthFactor: 200, minWidth: 0.8, maxWidth: 4.8 },
   meander: { base: 0.5, minSegmentLength: 16 },
   minRiverCells: 6,
+  /** islands smaller than `referenceShare` of all cells need less flow to start a river */
+  island: { referenceShare: 0.3, minScale: 0.08 },
 };
 
 export const TEMPERATURE_CONFIG = {
@@ -76,6 +78,8 @@ export const TEMPERATURE_CONFIG = {
   precipLapseInfluence: 0.5,
   maritimeRadius: 18,
   maritimeStrength: 0.12,
+  /** Extra spread away from 0.5 for cells far from any sea (hotter summers, colder winters). */
+  continentality: 0.35,
   aspectStrength: 0.05,
   coldPoolStrength: 0.06,
   smoothingPasses: 1,

@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openApp, watchErrors } from './lib/game';
+import { openApp, watchErrors, openTools } from './lib/game';
 
 test('welcome screen shows on the first visit and not on the next', async ({ page }) => {
   const errors = watchErrors(page);
@@ -7,7 +7,7 @@ test('welcome screen shows on the first visit and not on the next', async ({ pag
   const hero = page.getByRole('dialog', { name: 'Fantasy World' });
   await expect(hero).toBeVisible();
 
-  await hero.getByRole('button', { name: 'Generate world' }).click();
+  await hero.getByRole('button', { name: 'Explore this world' }).click();
   await expect(hero).toHaveCount(0);
 
   await page.reload();
@@ -19,7 +19,7 @@ test('welcome screen shows on the first visit and not on the next', async ({ pag
 test('random seed on the welcome screen changes the seed', async ({ page }) => {
   await openApp(page, { intro: true });
   const hero = page.getByRole('dialog', { name: 'Fantasy World' });
-  await hero.getByRole('button', { name: 'Random seed' }).click();
+  await hero.getByRole('button', { name: 'New random world' }).click();
   await expect(hero).toHaveCount(0);
   const seed = await page
     .getByRole('toolbar', { name: 'Map tools' })
@@ -30,6 +30,7 @@ test('random seed on the welcome screen changes the seed', async ({ page }) => {
 
 test('the help button reopens the welcome screen and Escape closes it', async ({ page }) => {
   await openApp(page);
+  await openTools(page);
   await page.getByRole('button', { name: 'About this map' }).click();
   const hero = page.getByRole('dialog', { name: 'Fantasy World' });
   await expect(hero).toBeVisible();

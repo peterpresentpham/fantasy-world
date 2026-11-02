@@ -34,6 +34,8 @@ const POP_MODEL = {
     radiusRange: 55,
     minBoost: 0.9,
     boostRange: 0.7,
+    /** extra pull of a place for a city, as a share of its base score */
+    site: { harbor: 0.5, riverside: 0.35, mouth: 0.7, confluence: 0.5 },
   },
 };
 
@@ -78,6 +80,26 @@ function calcRiverAccess(cells: TCell[]) {
     access[cellId] = clamp(Math.exp(-d / 8), 0, 1);
   }
   return access;
+}
+
+/**
+ * What a place offers a city beyond its land: a harbour on the sea, a river to trade on, a river
+ * mouth, a confluence where two rivers meet.
+ */
+function citySiteBonus(cell: TCell, cells: TCell[]) {
+  const site = POP_MODEL.urban.site;
+  let bonus = 0;
+  const touchesRiver = cell.isRiver || cell.neighbors.some((id) => cells[id].isRiver);
+  if (cell.neighbors.some((id) => cells[id].landform === 'marine_shallow')) bonus += site.harbor;
+  if (touchesRiver) bonus += site.riverside;
+  if (cell.isRiverMouth || cell.neighbors.some((id) => cells[id].isRiverMouth)) bonus += site.mouth;
+  if (cell.isRiver) {
+    const tributaries = cell.neighbors.filter(
+      (id) => cells[id].isRiver && cells[id].downstreamId === cell.id
+    );
+    if (tributaries.length >= 2) bonus += site.confluence;
+  }
+  return bonus;
 }
 
 function urbanEligibilityScore(cell: TCell): number {
@@ -223,7 +245,8 @@ export function buildPopulation({ mesh, seed }: TPopulationParams): TDelaunayMes
   for (const cell of cells) {
     const eligibility = urbanEligibilityByCell[cell.id] as number;
     if (eligibility <= 0.01) continue;
-    const candidateScore = (score[cell.id] + cell.suitability * 0.6) * eligibility;
+    const candidateScore =
+      (score[cell.id] + cell.suitability * 0.6) * eligibility * (1 + citySiteBonus(cell, cells));
     if (candidateScore <= 0.25) continue;
     urbanCandidates.push({ id: cell.id, score: candidateScore });
   }

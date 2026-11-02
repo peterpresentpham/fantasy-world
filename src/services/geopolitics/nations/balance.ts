@@ -1,6 +1,6 @@
 import { GEOPOLITICAL_CONFIG } from 'src/configs/map/geopolitics';
 import { TCell } from 'src/types/global';
-import { createSeededRandom } from 'src/services/utils/math';
+import { createSeededRandom, shuffleSeeded } from 'src/services/utils/math';
 import { getNationNeighborCounts, isLand } from '../shared';
 import {
   borrowCellForNation,
@@ -110,7 +110,7 @@ export function diversifySmallNationSizes(cells: TCell[], owner: Int32Array, see
   const averageSize = totalLandCells / nationCount;
   const hardCapTargetSize = Math.max(minNationCells + 12, Math.floor(averageSize * 1.85));
   const allNationIds = Array.from(sizeByNation.keys());
-  const shuffledNationIds = allNationIds.sort(() => random() - 0.5);
+  const shuffledNationIds = shuffleSeeded(allNationIds, random);
   const smallNationIds = allNationIds
     .filter((nationId) => (sizeByNation.get(nationId) || 0) <= minNationCells + 3)
     .sort((leftId, rightId) => (sizeByNation.get(leftId) || 0) - (sizeByNation.get(rightId) || 0));

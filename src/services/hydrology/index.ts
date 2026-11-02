@@ -307,25 +307,17 @@ function runHydrologyInternal({
     flow,
     terrains,
   });
-  const latitudeByCell = new Float32Array(cellCount);
-  for (let cellIndex = 0; cellIndex < cellCount; cellIndex += 1) {
-    const site = mesh.cells[cellIndex].site;
-    latitudeByCell[cellIndex] = Math.abs((site[1] / Math.max(1, mesh.height)) * 2 - 1);
-  }
   const biomes = classifyBiomes({
     landforms,
     temperature: temperatureAdjustedByCell,
     precipitation: precipitationAdjustedByCell,
     aridityIndex: aridityIndexByCell,
-    temperatureSeasonality: tempSeasonalityByCell,
-    precipitationSeasonality: precipSeasonalityByCell,
     elevationAboveSea: elevationAboveSeaByCell,
     flow,
     neighborsByCell,
     isRiverByCell: isRiver,
     isLakeByCell: isLake,
     humanImpact: climateControl.humanImpact,
-    latitudeByCell,
   });
   for (let cellIndex = 0; cellIndex < cells.length; cellIndex += 1) {
     const cell = cells[cellIndex];

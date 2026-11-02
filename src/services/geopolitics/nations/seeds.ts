@@ -1,7 +1,7 @@
 import { TCell } from 'src/types/global';
 import { sortDescStable } from 'src/services/utils';
 import { clamp } from 'src/services/utils/math';
-import { getNationSeedSuitability } from '../cost';
+import { buildPopulationSeedBonus, getNationSeedSuitability } from '../cost';
 import { isLand, makeFrontierHash } from '../shared';
 
 const LARGE_LAND_COMPONENT_MIN_CELLS = 200;
@@ -107,11 +107,12 @@ export function selectNationSeeds(
   connectivity: TConnectivityContext,
   minComponentSize = 1
 ) {
+  const populationBonus = buildPopulationSeedBonus(cells);
   const allLandCandidates = sortDescStable(
     cells
       .map((_, cellId) => ({
         cellId,
-        score: getNationSeedSuitability(cellId, cells),
+        score: getNationSeedSuitability(cellId, cells) + populationBonus[cellId],
         componentId: connectivity.cellId[cellId],
       }))
       .filter((entry) => isLand(cells[entry.cellId]))

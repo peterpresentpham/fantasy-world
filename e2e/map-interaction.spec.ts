@@ -15,13 +15,19 @@ const layerTransform = (page: Page) =>
     () => getComputedStyle(document.getElementById('map-base-canvas')!.parentElement!).transform
   );
 
+/** A point on land: the centre of the first nation label would do, here the centre of the map. */
+async function landPoint(page: Page): Promise<[number, number]> {
+  const center = await centerOfMap(page);
+  return [center.x, center.y];
+}
+
 async function centerOfMap(page: Page) {
   const box = await mapImage(page).boundingBox();
   if (!box) throw new Error('map has no bounding box');
   return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
 }
 
-test('wheel zoom, zoom buttons and reset', async ({ page }) => {
+test('wheel zoom, zoom buttons and reset', async ({ page, isMobile }) => {
   const errors = watchErrors(page);
   await openApp(page);
   await expect(resetZoom(page)).toBeDisabled();
@@ -34,7 +40,8 @@ test('wheel zoom, zoom buttons and reset', async ({ page }) => {
 
   await resetZoom(page).click();
   await expect(resetZoom(page)).toBeDisabled();
-  await expect(page.getByRole('img', { name: /Map overview/ })).toHaveCount(0);
+  // On a phone the map is wider than the screen even unzoomed, so the overview stays.
+  if (!isMobile) await expect(page.getByRole('img', { name: /Map overview/ })).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Zoom in' }).click();
   await expect(resetZoom(page)).toBeEnabled();
@@ -75,6 +82,24 @@ test('side panel opens on click, stays beside the map and Escape closes it', asy
   await expect(panel).toHaveCount(0);
 });
 
+test('on a phone the detail panel opens as a peek and expands on demand', async ({
+  page,
+  isMobile,
+}) => {
+  test.skip(!isMobile, 'the peek is a phone layout');
+  await openApp(page);
+  await page.mouse.click(...(await landPoint(page)));
+  const panel = page.getByRole('complementary', { name: /details/ });
+  await expect(panel).toBeVisible();
+  const peek = await panel.boundingBox();
+  expect(peek!.height).toBeLessThan(160);
+
+  await panel.getByRole('button', { name: 'Show more' }).click();
+  await expect.poll(async () => (await panel.boundingBox())!.height).toBeGreaterThan(300);
+  await panel.getByRole('button', { name: 'Show less' }).click();
+  await expect.poll(async () => (await panel.boundingBox())!.height).toBeLessThan(160);
+});
+
 test('keyboard shortcuts: R randomizes, digits switch view, +/0 zoom', async ({ page }) => {
   await openApp(page);
   const toolbar = page.getByRole('toolbar', { name: 'Map tools' });
@@ -104,7 +129,8 @@ test('shortcuts are ignored while typing in a field', async ({ page }) => {
   await expect(seed).toHaveValue('rr1');
 });
 
-test('hover tooltip is compact and expands while Shift is held', async ({ page }) => {
+test('hover tooltip is compact and expands while Shift is held', async ({ page, isMobile }) => {
+  test.skip(isMobile, 'hover and Shift need a mouse and keyboard');
   await openApp(page);
   await openConfig(page);
   await openTab(page, 'Display');

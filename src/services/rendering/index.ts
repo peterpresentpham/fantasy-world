@@ -46,6 +46,8 @@ type TTopDownInputs = {
   startCellId: number | null;
   goalCellId: number | null;
   seaLevel: number;
+  /** zoomed in far enough to show the smallest rivers */
+  showMinorRivers?: boolean;
 };
 
 export function renderIsometric(
@@ -139,6 +141,7 @@ export function renderTopDown(
     startCellId,
     goalCellId,
     seaLevel,
+    showMinorRivers = true,
   } = inputs;
 
   renderBackground(ctx, width, height);
@@ -160,7 +163,7 @@ export function renderTopDown(
   if (displaySettings.ethnicFill)
     drawEthnicFill(ctx, cells, displaySettings.landform || displaySettings.biome);
 
-  if (displaySettings.rivers) renderRivers(ctx, cells);
+  if (displaySettings.rivers) renderRivers(ctx, cells, showMinorRivers);
 
   if (displaySettings.nationBorders || displaySettings.ethnicBorders) {
     drawBordersUnified(ctx, cells, {

@@ -34,10 +34,11 @@ export default function CellCountPanel() {
   }
 
   return (
-    <BlurCard title="Mesh Density">
+    <BlurCard title="World Detail">
       <div className="space-y-2">
         <label className="fantasy-text-muted text-xs">
-          Cell count ({DEFAULT_CONFIG.minCells}-{DEFAULT_CONFIG.maxCells})
+          Number of cells ({DEFAULT_CONFIG.minCells}-{DEFAULT_CONFIG.maxCells}). More cells give
+          finer coastlines but take longer to generate.
         </label>
         <div className="flex items-center gap-2">
           <Input

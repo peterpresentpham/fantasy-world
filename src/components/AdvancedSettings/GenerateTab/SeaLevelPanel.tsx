@@ -1,37 +1,26 @@
-import { useEffect, useState } from 'react';
 import BlurCard from 'src/components/BlurCard';
-import { Button } from 'src/components/ui/button';
-import { Input } from 'src/components/ui/input';
 import { useMapExplorerStore } from 'src/store/mapExplorerStore';
+import CommitSlider from '../CommitSlider';
 
 export default function SeaLevelPanel() {
-  const { seaLevel, setSeaLevel, resetCounter } = useMapExplorerStore();
-  const [seaLevelDraft, setSeaLevelDraft] = useState(seaLevel);
-
-  useEffect(() => {
-    setSeaLevelDraft(seaLevel);
-  }, [resetCounter, seaLevel]);
-
-  function applySeaLevel() {
-    setSeaLevel(seaLevelDraft);
-  }
+  const seaLevel = useMapExplorerStore((s) => s.seaLevel);
+  const setSeaLevel = useMapExplorerStore((s) => s.setSeaLevel);
+  const resetCounter = useMapExplorerStore((s) => s.resetCounter);
 
   return (
     <BlurCard title="Sea Level">
-      <Input
-        type="number"
+      <CommitSlider
+        label="Sea level"
+        value={seaLevel}
         min={0.1}
         max={0.9}
         step={0.01}
-        value={seaLevelDraft}
-        onChange={(event) => setSeaLevelDraft(Number(event.target.value))}
+        lowLabel="More land"
+        highLabel="More ocean"
+        format={(value) => value.toFixed(2)}
+        resetKey={resetCounter}
+        onCommit={setSeaLevel}
       />
-      <div className="mt-2 flex items-center justify-between gap-2">
-        <p className="fantasy-text-muted text-xs">Applied: {seaLevel.toFixed(2)}</p>
-        <Button type="button" onClick={applySeaLevel}>
-          Confirm
-        </Button>
-      </div>
     </BlurCard>
   );
 }

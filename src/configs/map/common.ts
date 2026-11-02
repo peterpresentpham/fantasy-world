@@ -68,10 +68,10 @@ export const DEFAULT_CONFIG: TConfig = {
   topography: 'balanced',
   nationCount: 10,
   climateControl: {
-    temperatureOffset: 0.2,
-    temperatureContrast: 1.5,
-    precipitationScale: 1.5,
-    precipitationOffset: 0.3,
+    temperatureOffset: 0,
+    temperatureContrast: 1,
+    precipitationScale: 1.3,
+    precipitationOffset: 0.12,
     humanImpact: 0.5,
   },
   displaySettings: {
@@ -86,14 +86,17 @@ export const DEFAULT_CONFIG: TConfig = {
     precipitation: false,
     rainShadow: false,
     economy: false,
-    rivers: false,
-    nationBorders: false,
-    nationFill: false,
-    provinceBorders: false,
+    rivers: true,
+    nationBorders: true,
+    nationFill: true,
+    provinceBorders: true,
     ethnicBorders: false,
     ethnicFill: false,
     ethnicLabels: false,
-    labels: false,
+    labels: true,
     cellData: false,
   },
 };
+
+/** Lloyd relaxation of the cell sites: number of passes and how far each pass moves a site (0..1). */
+export const MESH_RELAXATION = { passes: 1, strength: 0.7 } as const;

@@ -45,6 +45,20 @@ export function createSeededRandom(seed: string, max = 4294967296) {
   };
 }
 
+/**
+ * A shuffled copy of `items` (Fisher-Yates). Use this instead of `sort(() => random() - 0.5)`: a
+ * random comparator is not a valid sort order, so the result depends on how the engine sorts and
+ * can differ between JIT tiers (it did, under Chrome's Maglev).
+ */
+export function shuffleSeeded<T>(items: readonly T[], random: () => number): T[] {
+  const result = [...items];
+  for (let index = result.length - 1; index > 0; index -= 1) {
+    const other = Math.floor(random() * (index + 1));
+    [result[index], result[other]] = [result[other], result[index]];
+  }
+  return result;
+}
+
 // ─── Simplex Noise 2D ───────────────────────────────────────────────────────────
 
 // Skew factors for 2D simplex noise

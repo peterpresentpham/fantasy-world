@@ -32,7 +32,13 @@ export const BORDER_CONFIG: Record<TBorderType, TBorderConfig> = {
       freshwater: 1.2,
       marine: 1.2,
     },
-    penalty: { riverCross: 7.8, lakeCross: 8.4, ridgeCross: 10.5, shorelineEdgeBias: -0.3 },
+    penalty: {
+      riverCross: 7.8,
+      lakeCross: 8.4,
+      ridgeCross: 10.5,
+      shorelineEdgeBias: -0.3,
+      ethnicCross: 9,
+    },
     fragmentation: {
       maxMountainOwnersPerCluster: 2,
       largeMountainClusterMinCells: 10,
@@ -71,7 +77,13 @@ export const BORDER_CONFIG: Record<TBorderType, TBorderConfig> = {
       freshwater: 1.2,
       marine: 1.2,
     },
-    penalty: { riverCross: 3.4, lakeCross: 4.2, ridgeCross: 4.8, shorelineEdgeBias: -0.2 },
+    penalty: {
+      riverCross: 3.4,
+      lakeCross: 4.2,
+      ridgeCross: 4.8,
+      shorelineEdgeBias: -0.2,
+      ethnicCross: 0,
+    },
     fragmentation: {
       maxMountainOwnersPerCluster: 3,
       largeMountainClusterMinCells: 7,
@@ -87,13 +99,13 @@ export const GEOPOLITICAL_CONFIG = {
   frontierNoise: 0.22,
   hubs: { smallNationMinLand: 450, mediumNationMinLand: 900, maxHubsPerNation: 3 },
   ethnic: {
-    majorGroupMin: 6,
+    /** Most peoples on one landmass. */
     majorGroupMax: 12,
-    dominantShareMin: 0.5,
-    dominantShareMax: 0.8,
-    secondaryShareMin: 0.1,
-    secondaryShareMax: 0.3,
-    crossBorderBlend: 0.28,
+    /** One people per this many land cells, but at least this many per nation on the landmass. */
+    cellsPerGroup: 1300,
+    /** Smaller islands do not get a people of their own; they take the nearest one. */
+    minLandmassCells: 150,
+    groupsPerNation: 1.5,
     fragmentationLevel: 0.38,
     terrainInfluenceStrength: 7.5,
     distancePenalty: 0.045,
@@ -101,6 +113,19 @@ export const GEOPOLITICAL_CONFIG = {
     minorityClusterMin: 5,
   },
 };
+
+/** Nations grow from where people live: how much settled land adds to a cell's value as a seed. */
+export const NATION_SEED_CONFIG = {
+  populationWeight: 1.8,
+  smoothingPasses: 2,
+  /** a city (a local population peak) is worth this much more as the core of a nation */
+  cityBonus: 2.5,
+  /** peaks below this share of the biggest city are villages, not cities */
+  minCityShare: 0.12,
+} as const;
+
+/** How far a nation's sea reaches from its coast (fraction of the map diagonal). */
+export const MARITIME_CONFIG = { territorialWidth: 0.028 } as const;
 
 /** Province-level constants moved from provinces.ts */
 export const IDEAL_PROVINCE_POP = 500_000;

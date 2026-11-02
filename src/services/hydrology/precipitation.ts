@@ -47,7 +47,7 @@ function getAlongWindGradient(cell: TCell, cells: TCell[], wind: TWindVector) {
   return numerator / denominator;
 }
 
-function getUpwindMoisture(cell: TCell, cells: TCell[], wind: TWindVector, moisture: Float32Array) {
+function getUpwindValue(cell: TCell, cells: TCell[], wind: TWindVector, values: Float32Array) {
   let totalWeight = 0;
   let totalMoisture = 0;
 
@@ -60,7 +60,7 @@ function getUpwindMoisture(cell: TCell, cells: TCell[], wind: TWindVector, moist
     const projected = dot(dx / distance, dy / distance, wind.x, wind.y);
     if (projected <= 0) continue;
     totalWeight += projected;
-    totalMoisture += moisture[neighborId] * projected;
+    totalMoisture += values[neighborId] * projected;
   }
 
   if (totalWeight <= 0) return 0;
@@ -99,7 +99,7 @@ export function computePrecipitation({
     for (let cellIndex = 0; cellIndex < cellCount; cellIndex += 1) {
       const cell = cells[cellIndex];
       const wind = windField[cellIndex];
-      const upwindMoisture = getUpwindMoisture(cell, cells, wind, moisture);
+      const upwindMoisture = getUpwindValue(cell, cells, wind, moisture);
       const advectedMoisture =
         upwindMoisture * PRECIPITATION_CONFIG.moistureAdvection.carry +
         moisture[cellIndex] * PRECIPITATION_CONFIG.moistureAdvection.selfCarry;
@@ -130,8 +130,10 @@ export function computePrecipitation({
         PRECIPITATION_CONFIG.orographic.leeDryingScale *
         Math.pow(Math.max(0, localMoisture), PRECIPITATION_CONFIG.orographic.shieldingPow);
 
+      // A dry lee is carried downwind, not kept in the cell that produced it.
+      const upwindDryness = getUpwindValue(cell, cells, wind, dryMemory);
       const rainShadowIndex = clamp(
-        dryMemory[cellIndex] * PRECIPITATION_CONFIG.orographic.rainShadowDecay +
+        upwindDryness * PRECIPITATION_CONFIG.orographic.rainShadowDecay +
           leeDrying * PRECIPITATION_CONFIG.orographic.rainShadowGain,
         0,
         1
@@ -146,8 +148,11 @@ export function computePrecipitation({
       const latitudeRain =
         getLatitudeFactor(cell.site[1], height) * PRECIPITATION_CONFIG.baseWeights.latitude;
       const baseRain = waterInfluence[cellIndex] * PRECIPITATION_CONFIG.baseWeights.water;
+      // Air that has crossed the ocean rains out slowly; far inland the supply runs dry.
+      const advectedRain =
+        clamp(localMoisture, 0, 1) * PRECIPITATION_CONFIG.baseWeights.advectedMoisture;
       const totalPrecipitation = clamp(
-        baseRain + latitudeRain + elevationRain + mountainRain - rainShadowIndex,
+        baseRain + advectedRain + latitudeRain + elevationRain + mountainRain - rainShadowIndex,
         0,
         1
       );

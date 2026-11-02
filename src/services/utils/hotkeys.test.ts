@@ -16,6 +16,7 @@ describe('resolveHotkey', () => {
     expect(press('=')).toEqual({ type: 'zoomIn' });
     expect(press('-')).toEqual({ type: 'zoomOut' });
     expect(press('0')).toEqual({ type: 'zoomReset' });
+    expect(press('t')).toEqual({ type: 'toggleRoute' });
     expect(press('Escape')).toEqual({ type: 'closePanel' });
   });
 

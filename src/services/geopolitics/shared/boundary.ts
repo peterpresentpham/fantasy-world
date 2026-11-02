@@ -1,4 +1,4 @@
-import { BORDER_CONFIG } from 'src/configs/map/geopolitics';
+import { BORDER_CONFIG, MARITIME_CONFIG } from 'src/configs/map/geopolitics';
 import { TBorderType, TCell, TLandform, TZoneType } from 'src/types/global';
 import { collectConnectedComponents } from 'src/services/utils/graph';
 import Cost from '../cost';
@@ -83,6 +83,14 @@ export function getBoundaryStepCost(
   if (isCoastalLand(neighbor, cells)) step += profile.penalty.shorelineEdgeBias;
   const sameOwnerNeighbors = countOwnedNeighbors(cells, owner, neighborId, ownerId);
   step += (2 - Math.min(2, sameOwnerNeighbors)) * profile.smoothness.jaggedPenalty;
+  // Peoples exist before nations, so a border prefers to follow where one people ends.
+  if (
+    currentCell.ethnicId !== null &&
+    neighbor.ethnicId !== null &&
+    currentCell.ethnicId !== neighbor.ethnicId
+  ) {
+    step += profile.penalty.ethnicCross;
+  }
   const noise = (edgeNoise(seedHash, currentId, neighborId) - 0.5) * 2;
   step += noise * profile.smoothness.edgeNoiseWeight;
   return Math.max(0.25, step);
@@ -158,13 +166,50 @@ export function getNationNeighborCounts(cells: TCell[], owner: Int32Array, cellI
   return counts;
 }
 
-export function assignMaritimeZones(cells: TCell[]) {
+/**
+ * Sea ownership. A lake inside a nation is its internal waters. Sea within `territorialWidth` of a
+ * coast belongs to the nearest coast's nation (territorial waters); the rest is international.
+ * Distance is counted in cells and scaled by the mean cell spacing, so it does not depend on the
+ * cell count.
+ */
+export function assignMaritimeZones(
+  cells: TCell[],
+  nationOwner: Int32Array,
+  width: number,
+  height: number
+) {
   const zoneType: TZoneType[] = Array.from({ length: cells.length }, () => 'international-waters');
   const waterOwner = new Int32Array(cells.length);
   waterOwner.fill(-1);
+  const hops = new Int32Array(cells.length).fill(-1);
+  const queue: number[] = [];
 
   for (let cellId = 0; cellId < cells.length; cellId += 1) {
-    if (isLand(cells[cellId])) zoneType[cellId] = 'land';
+    if (!isLand(cells[cellId])) continue;
+    zoneType[cellId] = 'land';
+    if (nationOwner[cellId] < 0) continue;
+    hops[cellId] = 0;
+    waterOwner[cellId] = nationOwner[cellId];
+    queue.push(cellId);
+  }
+
+  const spacing = Math.sqrt((width * height) / Math.max(1, cells.length));
+  const maxHops = Math.max(
+    1,
+    Math.round((Math.hypot(width, height) * MARITIME_CONFIG.territorialWidth) / spacing)
+  );
+
+  for (let head = 0; head < queue.length; head += 1) {
+    const current = queue[head] as number;
+    // Lakes belong to the land around them however wide they are.
+    if (hops[current] >= maxHops && !cells[current].isLake) continue;
+    for (const neighborId of cells[current].neighbors) {
+      if (hops[neighborId] >= 0 || isLand(cells[neighborId])) continue;
+      hops[neighborId] = hops[current] + 1;
+      waterOwner[neighborId] = waterOwner[current];
+      zoneType[neighborId] = cells[neighborId].isLake ? 'internal-waters' : 'territorial-waters';
+      queue.push(neighborId);
+    }
   }
   return { waterOwner, zoneType };
 }

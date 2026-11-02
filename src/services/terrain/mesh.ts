@@ -1,4 +1,5 @@
 import { Delaunay } from 'd3-delaunay';
+import { MESH_RELAXATION } from 'src/configs/map/common';
 import { toPointKey } from 'src/services/utils/geometry';
 import { clamp, createSeededRandom } from 'src/services/utils/math';
 import { TCell, TDelaunayMesh, TEdge, TMeshParams, TPoint, TVertex } from 'src/types/global';
@@ -24,6 +25,37 @@ function genPoints({ width, height, seed, cellCount }: TMeshParams): TPoint[] {
   return points;
 }
 
+/**
+ * One Lloyd pass: each point moves toward the centre of its Voronoi cell. Cells come out more even
+ * in size and shape, which smooths coastlines and borders. Only part of the way, so the mesh
+ * stays slightly irregular rather than turning into a honeycomb.
+ */
+function relaxPoints(points: TPoint[], width: number, height: number, strength: number): TPoint[] {
+  const voronoi = Delaunay.from(points).voronoi([0, 0, width, height]);
+  return points.map((point, index) => {
+    const polygon = voronoi.cellPolygon(index);
+    if (!polygon || polygon.length < 4) return point;
+    let area = 0;
+    let cx = 0;
+    let cy = 0;
+    for (let i = 0; i < polygon.length - 1; i += 1) {
+      const [x0, y0] = polygon[i];
+      const [x1, y1] = polygon[i + 1];
+      const cross = x0 * y1 - x1 * y0;
+      area += cross;
+      cx += (x0 + x1) * cross;
+      cy += (y0 + y1) * cross;
+    }
+    if (Math.abs(area) < 1e-9) return point;
+    const centroidX = cx / (3 * area);
+    const centroidY = cy / (3 * area);
+    return [
+      clamp(point[0] + (centroidX - point[0]) * strength, 0, width),
+      clamp(point[1] + (centroidY - point[1]) * strength, 0, height),
+    ] as TPoint;
+  });
+}
+
 function sanitizePolygon(polygon: Iterable<TPoint> | null | undefined): TPoint[] {
   if (!polygon) return [];
 
@@ -43,7 +75,10 @@ function createEdgeKey(vertexAId: number, vertexBId: number) {
 }
 
 export function buildMesh({ width, height, seed, cellCount }: TMeshParams): TDelaunayMesh {
-  const points = genPoints({ width, height, cellCount, seed });
+  let points = genPoints({ width, height, cellCount, seed });
+  for (let pass = 0; pass < MESH_RELAXATION.passes; pass += 1) {
+    points = relaxPoints(points, width, height, MESH_RELAXATION.strength);
+  }
   const delaunay = Delaunay.from(points);
   const voronoi = delaunay.voronoi([0, 0, width, height]);
   const vertexIdByKey = new Map<string, number>();

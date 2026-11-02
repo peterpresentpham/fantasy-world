@@ -8,7 +8,7 @@ const PORT = 5191;
 export default defineConfig({
   testDir: './e2e',
   outputDir: './test-reports/e2e/artifacts',
-  timeout: 120_000,
+  timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: true,
   retries: 0,
@@ -31,7 +31,8 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['Pixel 5'] } },
   ],
   webServer: {
-    command: `npm run build && npx next start --port ${PORT}`,
+    // E2E_SKIP_BUILD=1 reuses the existing .next build (run `npm run build` first).
+    command: `${process.env.E2E_SKIP_BUILD ? '' : 'npm run build && '}npx next start --port ${PORT}`,
     port: PORT,
     reuseExistingServer: false,
     timeout: 300_000,

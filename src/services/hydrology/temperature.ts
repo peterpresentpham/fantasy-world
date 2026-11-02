@@ -129,14 +129,19 @@ export function computeTemperature({
       Math.max(0, 1 - flow[cellIndex] / 4) *
       TEMPERATURE_CONFIG.coldPoolStrength;
 
-    temperature[cellIndex] = clamp(
+    const base =
       1 -
-        latitudeCooling -
-        elevationCooling +
-        maritimeModeration -
-        aspectCooling -
-        coldPool +
-        seasonOffset,
+      latitudeCooling -
+      elevationCooling +
+      maritimeModeration -
+      aspectCooling -
+      coldPool +
+      seasonOffset;
+    // Deep inland the sea no longer evens things out: warm places get warmer, cold ones colder.
+    const continentality =
+      1 - clamp(waterInfluence[cellIndex] * 0.5 + maritimeInfluence * 0.5, 0, 1);
+    temperature[cellIndex] = clamp(
+      0.5 + (base - 0.5) * (1 + continentality * TEMPERATURE_CONFIG.continentality),
       0,
       1
     );
